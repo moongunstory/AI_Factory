@@ -1,0 +1,28 @@
+이미지 
+Stable Diffusion 3.5 Large (SD 3.5)
+
+상업적 사용 가능 - 연 매출 100만달러 이하에세만
+
+영상
+AnimateDiff - 프레임워크는 Apache-2.0 계열로 상업 사용 허용
+Stable Video Diffusion - 라이선스가 모델별로 달라서, 반드시 상업 허용 버전만
+
+오디오
+Stable Audio Open 1.0
+
+라이선스: Stable Audio Open 모델은 Stability AI Community License.
+
+연 매출 100만 달러 미만이면 상업 사용 무료
+
+전문화 툴
+comfy ui - 상업적 사용 가능
+
+요구 사양
+
+comfy ui 는 pytorch + CUDA 기반
+
+NVIDIA 그래픽 카드 필수 AMD 불가능
+
+VRAM 최소 12GB
+
+RTX 5090이면 BEST
