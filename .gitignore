@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+
+# Local models (too large)
+models/
+
+# Output files (video, images, logs)
+output/
+*.mp4
+*.mov
+*.avi
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.wav
+*.mp3
+
+# LLaMA engine
+llama.cpp/
+
+# Logs
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
