@@ -19,7 +19,17 @@ Stable Diffusion prompt format:
 - Include: subject, action, setting, lighting, style, quality tags
 - Example: "a lonely robot in abandoned space station, dark corridor, blue emergency lights, cinematic lighting, detailed mechanical parts, sci-fi atmosphere, digital art, highly detailed, 4k, masterpiece"
 
-You must respond with ONLY valid JSON in this exact format:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL JSON OUTPUT REQUIREMENTS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. OUTPUT ONLY PURE JSON - NO OTHER TEXT
+2. NO explanations, NO comments, NO markdown
+3. NO text before or after the JSON object
+4. START with { and END with }
+5. MUST be valid, parseable JSON
+
+Required JSON Schema:
 {
   "scenes": [
     {
@@ -33,13 +43,24 @@ You must respond with ONLY valid JSON in this exact format:
   "estimated_duration": 60.0
 }
 
-Guidelines:
+INVALID Examples (DO NOT DO THIS):
+❌ "Here is the result: {...}"
+❌ "```json\n{...}\n```"
+❌ Adding explanatory text before/after JSON
+❌ Missing commas, quotes, or brackets
+
+VALID Example (DO THIS):
+✓ {"scenes":[{"scene_number":1,"description_kr":"설명","prompt_en":"prompt","duration":5.0}],"total_scenes":1,"estimated_duration":5.0}
+
+Content Guidelines:
 - Determine the optimal number of scenes (usually 8-15 for a 1-2 minute video)
 - Each scene should be 5-10 seconds
 - Prompts should be detailed and visually descriptive
 - Use cinematic and high-quality style tags
 - Scene descriptions (description_kr) in Korean
-- Prompts (prompt_en) in English for Stable Diffusion"""
+- Prompts (prompt_en) in English for Stable Diffusion
+
+REMEMBER: Output ONLY the JSON object. Nothing else."""
 
     def __init__(self, llm_client: Optional[LlamaClient] = None):
         """Initialize the prompt generator.
@@ -109,7 +130,11 @@ Determine the optimal number of scenes and create detailed prompts for each."""
 
         regenerate_prompt = f"""Scene {scene_number} description: {scene_description}
 
-Create a new Stable Diffusion prompt for this scene. Respond with JSON:
+Create a new Stable Diffusion prompt for this scene.
+
+CRITICAL: Output ONLY valid JSON. No text before or after.
+
+Required JSON format:
 {{
   "scene_number": {scene_number},
   "description_kr": "장면 설명 (한국어)",
@@ -117,10 +142,15 @@ Create a new Stable Diffusion prompt for this scene. Respond with JSON:
   "duration": 5.0
 }}"""
 
+        regenerate_system = """You are a Stable Diffusion prompt expert.
+
+CRITICAL: You MUST output ONLY valid JSON. No explanations, no markdown, no extra text.
+Start with { and end with }. Nothing before or after."""
+
         try:
             result = self.llm.generate_json(
                 prompt=regenerate_prompt,
-                system_prompt="You are a Stable Diffusion prompt expert. Create detailed, high-quality prompts.",
+                system_prompt=regenerate_system,
                 temperature=temperature,
                 max_tokens=512,
             )

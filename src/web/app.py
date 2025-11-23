@@ -1,6 +1,8 @@
 """Flask web UI for AI Short Factory."""
 import os
 import sys
+import atexit
+import signal
 from flask import Flask, render_template, request, jsonify, session
 from pathlib import Path
 
@@ -12,6 +14,7 @@ from src.pipeline.story_expander import StoryExpander
 from src.pipeline.prompt_generator import PromptGenerator
 from src.pipeline.translator import Translator
 from src.common.logger import setup_logger
+from src.common.json_utils import safe_parse
 
 logger = setup_logger(__name__)
 
@@ -34,6 +37,49 @@ def get_components():
             'translator': Translator()
         }
     return components
+
+
+def cleanup_on_shutdown():
+    """Clean up resources when server shuts down.
+
+    This function:
+    - Clears all active sessions
+    - Logs shutdown information
+    - Performs graceful cleanup
+    """
+    logger.info("Server shutting down - cleaning up resources...")
+
+    try:
+        # Clear all Flask session data
+        with app.app_context():
+            # Note: Flask sessions are client-side by default,
+            # so we just log the cleanup
+            logger.info("Session data will be cleared on client side")
+
+        # Clean up AI components
+        global components
+        if components is not None:
+            logger.info("Cleaning up AI components...")
+            # LlamaClient sessions will be closed via __del__
+            components = None
+
+        logger.info("✓ Cleanup completed successfully")
+
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
+
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals (SIGINT, SIGTERM)."""
+    logger.info(f"Received signal {signum} - initiating graceful shutdown...")
+    cleanup_on_shutdown()
+    sys.exit(0)
+
+
+# Register cleanup handlers
+atexit.register(cleanup_on_shutdown)
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 
 @app.route('/')

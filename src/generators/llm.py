@@ -19,6 +19,7 @@ from urllib3.util.retry import Retry
 
 from ..common.config import Config
 from ..common.logger import setup_logger
+from ..common.json_utils import safe_parse
 
 logger = setup_logger(__name__)
 
@@ -188,44 +189,70 @@ class LlamaClient:
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
+        fallback: Optional[Dict[str, Any]] = None,
+        strict: bool = True,
         **kwargs
     ) -> Dict[str, Any]:
-        """Generate JSON output using llama-server API.
+        """Generate JSON output using llama-server API with automatic repair.
+
+        This method uses a two-layer approach for maximum reliability:
+        1. Enhanced system prompt that strictly enforces JSON output format
+        2. Automatic JSON repair using safe_parse() if output is malformed
 
         Args:
             prompt: The user prompt
             system_prompt: Optional system prompt
+            fallback: Fallback value if JSON parsing completely fails
+            strict: If True, raise exception on parse failure (default: True)
             **kwargs: Additional arguments for generate()
 
         Returns:
             Parsed JSON dictionary
 
         Raises:
-            RuntimeError: If JSON parsing fails
+            RuntimeError: If strict=True and JSON parsing fails after repair
         """
-        # Enhance system prompt to enforce JSON output
-        json_system_prompt = (
-            system_prompt or ""
-        ) + "\n\nYou must respond with valid JSON only. No additional text."
+        # Layer 1: Enhance system prompt to enforce strict JSON output
+        json_enforcement = """
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL: JSON OUTPUT REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You MUST respond with ONLY valid JSON.
+- NO text before the JSON
+- NO text after the JSON
+- NO markdown code blocks
+- NO explanations
+- START with { or [
+- END with } or ]
+- MUST be valid, parseable JSON"""
+
+        json_system_prompt = (system_prompt or "") + json_enforcement
+
+        # Generate output with enhanced prompt
         output = self.generate(prompt, system_prompt=json_system_prompt, **kwargs)
 
-        # Try to extract JSON from the output
+        logger.debug(f"Raw LLM output (first 200 chars): {output[:200]}")
+
+        # Layer 2: Use safe_parse with automatic repair
         try:
-            # Find JSON content (between first { and last })
-            start_idx = output.find('{')
-            end_idx = output.rfind('}')
+            result = safe_parse(output, fallback=fallback, strict=strict)
+            logger.info("JSON parsed successfully from LLM output")
+            return result
 
-            if start_idx == -1 or end_idx == -1:
-                raise ValueError("No JSON object found in output")
+        except ValueError as e:
+            logger.error(f"JSON parsing failed even after repair: {e}")
+            logger.debug(f"Full output: {output}")
 
-            json_str = output[start_idx:end_idx + 1]
-            return json.loads(json_str)
+            if strict:
+                raise RuntimeError(
+                    f"Failed to parse JSON from LLM output even after repair.\n"
+                    f"Error: {e}\n"
+                    f"Output preview: {output[:500]}..."
+                )
 
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.error(f"Failed to parse JSON: {e}")
-            logger.debug(f"Raw output: {output}")
-            raise RuntimeError(f"Failed to parse JSON from LLM output: {e}")
+            # Return fallback if not strict
+            return fallback or {}
 
     def is_server_ready(self) -> bool:
         """Check if llama-server is ready to accept requests.
