@@ -7,9 +7,9 @@ echo " AI Short Factory - Web UI 실행기"
 echo "==========================================="
 echo ""
 
-# Streamlit 설치 확인
-if ! command -v streamlit &> /dev/null; then
-    echo "[오류] Streamlit이 설치되지 않았습니다"
+# Flask 설치 확인
+if ! python3 -c "import flask" &> /dev/null; then
+    echo "[오류] Flask가 설치되지 않았습니다"
     echo "필요한 패키지를 설치합니다..."
     pip install -r requirements.txt
     echo ""
@@ -29,11 +29,11 @@ if [ ! -f "bin/llama-cli" ]; then
     echo ""
 fi
 
-echo "Streamlit 웹 UI를 시작합니다..."
-echo "브라우저에서 http://localhost:8501 로 접속하세요"
+echo "Flask 웹 UI를 시작합니다..."
+echo "브라우저에서 http://localhost:5000 으로 접속하세요"
 echo ""
 echo "Ctrl+C를 눌러 서버를 중지할 수 있습니다"
 echo ""
 
-# Streamlit 실행
-streamlit run src/app.py
+# Flask 실행
+python3 src/web/app.py

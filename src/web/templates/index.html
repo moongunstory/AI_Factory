@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Short Factory</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI Short Factory</h1>
+            <p class="subtitle">간단한 아이디어를 영상 프롬프트로 변환</p>
+        </header>
+
+        <hr>
+
+        <!-- Step 1: Story Input -->
+        <section class="step-section">
+            <h2>1. 이야기 아이디어 입력</h2>
+            <textarea
+                id="simple-idea"
+                class="story-input"
+                placeholder="예: 우주 정거장에서 깨어난 로봇이 인류의 마지막 메시지를 찾는 이야기"
+                rows="4"></textarea>
+
+            <button id="expand-btn" class="btn btn-primary" disabled>이야기 확장</button>
+            <div id="expand-loading" class="loading hidden">이야기를 확장하는 중...</div>
+        </section>
+
+        <!-- Step 2: Expanded Story Display -->
+        <section id="expanded-section" class="step-section hidden">
+            <h2>2. 확장된 이야기</h2>
+
+            <div class="story-box">
+                <h3>생성된 이야기</h3>
+                <div id="expanded-story-text" class="info-box"></div>
+            </div>
+
+            <div class="button-group">
+                <button id="confirm-btn" class="btn btn-primary">컨펌 (프롬프트 생성)</button>
+                <button id="retry-story-btn" class="btn btn-secondary">재시도 (이야기 다시 생성)</button>
+            </div>
+            <div id="generate-loading" class="loading hidden">프롬프트를 생성하는 중...</div>
+        </section>
+
+        <!-- Step 3: Prompts Display -->
+        <section id="prompts-section" class="step-section hidden">
+            <h2>3. 생성된 장면 프롬프트</h2>
+
+            <div id="prompts-summary" class="prompts-summary"></div>
+            <hr>
+
+            <div id="scenes-container"></div>
+
+            <hr>
+            <div id="regenerate-controls" class="hidden">
+                <button id="regenerate-btn" class="btn btn-secondary">선택한 장면 재생성</button>
+                <div id="regenerate-loading" class="loading hidden">장면을 재생성하는 중...</div>
+            </div>
+            <div id="regenerate-info" class="info-message">
+                재생성할 장면을 선택하려면 체크박스를 체크하세요.
+            </div>
+        </section>
+
+        <footer>
+            <p>AI Short Factory - Powered by Local LLM (llama.cpp)</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
