@@ -50,4 +50,7 @@ echo ""
 echo "Ctrl+C를 눌러 서버를 종료하세요"
 echo ""
 
+# 서버 시작 후 자동으로 브라우저 열기 (2초 후)
+(sleep 2 && xdg-open http://localhost:5000 2>/dev/null) &
+
 python3 "$PROJECT_DIR/src/web/app.py"
