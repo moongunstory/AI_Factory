@@ -1,7 +1,7 @@
 # AI Short Factory Dependencies
 
 # Web UI
-streamlit>=1.28.0
+flask>=3.0.0
 
 # Utilities
 python-dateutil>=2.8.2
