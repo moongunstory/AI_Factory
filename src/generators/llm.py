@@ -1,8 +1,21 @@
-"""LLM generator using llama.cpp."""
-import subprocess
+"""LLM generator using llama-server HTTP API.
+
+이 모듈은 llama.cpp의 llama-server와 HTTP로 통신합니다.
+기존의 subprocess 기반 llama-cli 실행 방식을 대체하여 성능을 대폭 향상시킵니다.
+
+주요 개선사항:
+- 모델을 매번 로드하지 않음 (10-50배 속도 향상)
+- persistent HTTP 연결 사용
+- 메모리 사용량 대폭 감소
+- 동시 요청 처리 가능
+"""
 import json
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from ..common.config import Config
 from ..common.logger import setup_logger
@@ -11,38 +24,80 @@ logger = setup_logger(__name__)
 
 
 class LlamaClient:
-    """Client for interacting with llama.cpp."""
+    """Client for interacting with llama-server via HTTP API.
+
+    이 클라이언트는 llama-server가 이미 실행 중이라고 가정합니다.
+    llama-server는 scripts/llama_server_manager.sh로 관리됩니다.
+    """
 
     def __init__(
         self,
-        model_path: Optional[Path] = None,
+        server_url: Optional[str] = None,
         temperature: float = Config.LLM_TEMPERATURE,
         max_tokens: int = Config.LLM_MAX_TOKENS,
         top_p: float = Config.LLM_TOP_P,
-        threads: int = Config.LLM_THREADS,
+        timeout: int = Config.LLM_REQUEST_TIMEOUT,
     ):
         """Initialize the Llama client.
 
         Args:
-            model_path: Path to the GGUF model file
+            server_url: llama-server URL (기본값: Config.LLAMA_SERVER_URL)
             temperature: Sampling temperature (0.0-1.0)
             max_tokens: Maximum tokens to generate
             top_p: Top-p sampling parameter
-            threads: Number of threads to use
+            timeout: Request timeout in seconds
         """
-        self.model_path = model_path or Config.get_model_file()
+        self.server_url = server_url or Config.LLAMA_SERVER_URL
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.top_p = top_p
-        self.threads = threads
+        self.timeout = timeout
 
-        if not self.model_path.exists():
-            raise FileNotFoundError(f"Model file not found: {self.model_path}")
+        # HTTP 세션 설정 (연결 재사용)
+        self.session = requests.Session()
 
-        if not Config.LLAMA_CPP_PATH.exists():
-            raise FileNotFoundError(f"llama-cli not found: {Config.LLAMA_CPP_PATH}")
+        # Retry 전략: 연결 실패 시 3번까지 재시도
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[500, 502, 503, 504],
+            allowed_methods=["POST", "GET"]
+        )
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=10,
+            pool_maxsize=20
+        )
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
 
-        logger.info(f"Initialized LlamaClient with model: {self.model_path.name}")
+        logger.info(f"Initialized LlamaClient with server: {self.server_url}")
+
+        # 서버 연결 확인
+        self._check_server_health()
+
+    def _check_server_health(self) -> None:
+        """Check if llama-server is running and healthy."""
+        try:
+            response = self.session.get(
+                f"{self.server_url}/health",
+                timeout=Config.LLM_CONNECT_TIMEOUT
+            )
+            if response.status_code == 200:
+                logger.info("✓ llama-server is healthy and ready")
+            else:
+                logger.warning(f"llama-server returned status {response.status_code}")
+        except requests.exceptions.RequestException as e:
+            error_msg = (
+                f"Failed to connect to llama-server at {self.server_url}\n"
+                f"Error: {e}\n\n"
+                f"llama-server가 실행 중인지 확인하세요:\n"
+                f"  ./scripts/llama_server_manager.sh status\n"
+                f"실행되지 않았다면:\n"
+                f"  ./scripts/llama_server_manager.sh start"
+            )
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
 
     def generate(
         self,
@@ -50,53 +105,84 @@ class LlamaClient:
         system_prompt: Optional[str] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
+        stream: bool = False,
     ) -> str:
-        """Generate text using llama.cpp.
+        """Generate text using llama-server API.
 
         Args:
             prompt: The user prompt
             system_prompt: Optional system prompt
             temperature: Override default temperature
             max_tokens: Override default max tokens
+            stream: Enable streaming (기본값: False)
 
         Returns:
             Generated text
+
+        Raises:
+            RuntimeError: If generation fails
         """
-        # Build the full prompt
-        full_prompt = prompt
+        # Build the full prompt with system prompt if provided
         if system_prompt:
-            full_prompt = f"{system_prompt}\n\n{prompt}"
+            # llama.cpp format: system prompt + user prompt
+            full_prompt = f"<|system|>\n{system_prompt}\n<|user|>\n{prompt}\n<|assistant|>\n"
+        else:
+            full_prompt = prompt
 
-        # Build llama.cpp command
-        cmd = [
-            str(Config.LLAMA_CPP_PATH),
-            "-m", str(self.model_path),
-            "-p", full_prompt,
-            "-n", str(max_tokens or self.max_tokens),
-            "--temp", str(temperature or self.temperature),
-            "--top-p", str(self.top_p),
-            "-t", str(self.threads),
-            "--log-disable",  # Disable internal logging
-        ]
+        # Build request payload
+        payload = {
+            "prompt": full_prompt,
+            "n_predict": max_tokens or self.max_tokens,
+            "temperature": temperature or self.temperature,
+            "top_p": self.top_p,
+            "stream": stream,
+            "cache_prompt": True,  # 프롬프트 캐싱 활성화 (속도 향상)
+            "stop": ["<|user|>", "<|system|>"],  # Stop sequences
+        }
 
-        logger.info(f"Running llama.cpp with prompt length: {len(full_prompt)} chars")
-        logger.debug(f"Command: {' '.join(cmd)}")
+        logger.info(f"Generating text (prompt length: {len(full_prompt)} chars)")
+        logger.debug(f"Payload: {json.dumps(payload, indent=2, ensure_ascii=False)}")
+
+        start_time = time.time()
 
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True,
+            response = self.session.post(
+                f"{self.server_url}/completion",
+                json=payload,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+
+            result = response.json()
+            generated_text = result.get("content", "").strip()
+
+            elapsed = time.time() - start_time
+            tokens_generated = result.get("tokens_predicted", 0)
+            tokens_per_sec = tokens_generated / elapsed if elapsed > 0 else 0
+
+            logger.info(
+                f"Generated {len(generated_text)} characters "
+                f"({tokens_generated} tokens) in {elapsed:.2f}s "
+                f"({tokens_per_sec:.1f} tokens/sec)"
             )
 
-            output = result.stdout.strip()
-            logger.info(f"Generated {len(output)} characters")
-            return output
+            return generated_text
 
-        except subprocess.CalledProcessError as e:
-            logger.error(f"llama.cpp failed: {e.stderr}")
-            raise RuntimeError(f"LLM generation failed: {e.stderr}")
+        except requests.exceptions.Timeout:
+            logger.error(f"Request timeout after {self.timeout}s")
+            raise RuntimeError(
+                f"LLM generation timeout after {self.timeout}s. "
+                f"프롬프트가 너무 길거나 서버 부하가 높을 수 있습니다."
+            )
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"llama-server request failed: {e}")
+            raise RuntimeError(f"LLM generation failed: {e}")
+
+        except (KeyError, json.JSONDecodeError) as e:
+            logger.error(f"Failed to parse llama-server response: {e}")
+            logger.debug(f"Response: {response.text}")
+            raise RuntimeError(f"Invalid response from llama-server: {e}")
 
     def generate_json(
         self,
@@ -104,7 +190,7 @@ class LlamaClient:
         system_prompt: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """Generate JSON output using llama.cpp.
+        """Generate JSON output using llama-server API.
 
         Args:
             prompt: The user prompt
@@ -113,6 +199,9 @@ class LlamaClient:
 
         Returns:
             Parsed JSON dictionary
+
+        Raises:
+            RuntimeError: If JSON parsing fails
         """
         # Enhance system prompt to enforce JSON output
         json_system_prompt = (
@@ -137,3 +226,40 @@ class LlamaClient:
             logger.error(f"Failed to parse JSON: {e}")
             logger.debug(f"Raw output: {output}")
             raise RuntimeError(f"Failed to parse JSON from LLM output: {e}")
+
+    def is_server_ready(self) -> bool:
+        """Check if llama-server is ready to accept requests.
+
+        Returns:
+            True if server is ready, False otherwise
+        """
+        try:
+            response = self.session.get(
+                f"{self.server_url}/health",
+                timeout=5
+            )
+            return response.status_code == 200
+        except requests.exceptions.RequestException:
+            return False
+
+    def get_server_info(self) -> Dict[str, Any]:
+        """Get information about the llama-server.
+
+        Returns:
+            Server information dictionary
+        """
+        try:
+            response = self.session.get(
+                f"{self.server_url}/props",
+                timeout=5
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to get server info: {e}")
+            return {}
+
+    def __del__(self):
+        """Cleanup resources."""
+        if hasattr(self, 'session'):
+            self.session.close()
