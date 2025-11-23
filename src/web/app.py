@@ -198,9 +198,11 @@ def regenerate_scenes():
 
 
 if __name__ == '__main__':
-    # Development server
+    # Development server with threading enabled for better concurrency
     app.run(
         host='127.0.0.1',
         port=5000,
-        debug=True
+        debug=True,
+        threaded=True,  # 동시 요청 처리 가능
+        use_reloader=False  # llama-server와의 충돌 방지
     )
