@@ -7,6 +7,8 @@ echo " AI Short Factory - Web UI 실행기"
 echo "==========================================="
 echo ""
 
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 # Flask 설치 확인
 if ! python3 -c "import flask" &> /dev/null; then
     echo "[오류] Flask가 설치되지 않았습니다"
@@ -15,25 +17,37 @@ if ! python3 -c "import flask" &> /dev/null; then
     echo ""
 fi
 
-# llama.cpp 모델 존재 확인
-if [ ! -f "models/model-q4_K_M.gguf" ]; then
-    echo "[경고] LLaMA 모델을 찾을 수 없습니다: models/model-q4_K_M.gguf"
-    echo "GGUF 모델을 다운로드하여 models/ 디렉토리에 배치하세요"
+# llama.cpp 모델 경로
+MODEL_PATH="$PROJECT_DIR/models/llama-3.1-8b/model-q4_K_M.gguf"
+
+# llama.cpp 실행 파일 경로
+LLAMA_CLI="$PROJECT_DIR/engine/llama.cpp/build/bin/llama-cli"
+
+# 모델 존재 확인
+if [ ! -f "$MODEL_PATH" ]; then
+    echo "[경고] LLaMA 모델이 없습니다:"
+    echo "    $MODEL_PATH"
+    echo "올바른 위치에 GGUF 모델을 두세요."
     echo ""
+else
+    echo "[확인] LLaMA 모델 발견됨"
 fi
 
 # llama-cli 존재 확인
-if [ ! -f "bin/llama-cli" ]; then
-    echo "[경고] llama-cli를 찾을 수 없습니다: bin/llama-cli"
-    echo "llama.cpp를 빌드하여 llama-cli를 bin/ 디렉토리에 배치하세요"
+if [ ! -f "$LLAMA_CLI" ]; then
+    echo "[경고] llama-cli가 없습니다:"
+    echo "    $LLAMA_CLI"
+    echo "llama.cpp를 빌드하여 실행 파일을 생성하세요."
     echo ""
+else
+    echo "[확인] llama-cli 발견됨"
 fi
 
-echo "Flask 웹 UI를 시작합니다..."
-echo "브라우저에서 http://localhost:5000 으로 접속하세요"
 echo ""
-echo "Ctrl+C를 눌러 서버를 중지할 수 있습니다"
+echo "Flask 웹 UI를 시작합니다..."
+echo "  → http://localhost:5000"
+echo ""
+echo "Ctrl+C를 눌러 서버를 종료하세요"
 echo ""
 
-# Flask 실행
-python3 src/web/app.py
+python3 "$PROJECT_DIR/src/web/app.py"
