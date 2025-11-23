@@ -283,10 +283,15 @@ Ensure the character designs fit the visual theme and are highly specific for co
         char_descriptions = []
         for char in character_sheets.get('characters', []):
             desc = (
-                f"- {char['name']} ({char['role']}): "
-                f"{char['physical']}, {char['costume']}, {char['equipment']}. "
-                f"Consistency: {char['consistency_tags']}"
+                f"- {char.get('name', 'Unknown')} ({char.get('role', 'character')}): "
+                f"{char.get('physical', '')}, {char.get('costume', '')}"
             )
+            equipment = char.get('equipment', '')
+            if equipment:
+                desc += f", {equipment}"
+            consistency = char.get('consistency_tags', '')
+            if consistency:
+                desc += f". Consistency: {consistency}"
             char_descriptions.append(desc)
 
         characters_context = "\n".join(char_descriptions)
@@ -472,7 +477,10 @@ Create compelling, visually rich scenes that flow naturally like a single video.
         # Prepare character descriptions
         char_descriptions = []
         for char in character_sheets.get('characters', []):
-            desc = f"{char['name']}: {char['physical']}, {char['costume']}"
+            desc = f"{char.get('name', 'Unknown')}: {char.get('physical', '')}, {char.get('costume', '')}"
+            equipment = char.get('equipment', '')
+            if equipment:
+                desc += f", {equipment}"
             char_descriptions.append(desc)
 
         characters_context = "\n".join(char_descriptions)
