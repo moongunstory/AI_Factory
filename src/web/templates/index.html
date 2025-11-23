@@ -24,6 +24,26 @@
                 placeholder="예: 우주 정거장에서 깨어난 로봇이 인류의 마지막 메시지를 찾는 이야기"
                 rows="4"></textarea>
 
+            <!-- Theme Selection -->
+            <div class="theme-selection">
+                <h3>비주얼 스타일 테마 선택</h3>
+                <select id="theme-select" class="theme-dropdown">
+                    <option value="cinematic_realism">영화적 사실주의</option>
+                    <option value="dark_fantasy">다크 판타지</option>
+                    <option value="anime">애니메이션</option>
+                    <option value="disney">디즈니</option>
+                    <option value="game_cinematic">게임 시네마틱</option>
+                    <option value="cyber_fantasy">사이버 판타지</option>
+                    <option value="horror">호러</option>
+                    <option value="fantasy_adventure">판타지 어드벤처</option>
+                    <option value="sci_fi">공상과학</option>
+                    <option value="retro_synthwave">레트로 신스웨이브</option>
+                </select>
+                <p class="theme-description" id="theme-description">
+                    자연스러운 색감과 현실적인 조명으로 영화 같은 사실적인 분위기를 연출합니다.
+                </p>
+            </div>
+
             <button id="expand-btn" class="btn btn-primary" disabled>이야기 확장</button>
             <div id="expand-loading" class="loading hidden">이야기를 확장하는 중...</div>
         </section>
@@ -35,6 +55,18 @@
             <div class="story-box">
                 <h3>생성된 이야기</h3>
                 <div id="expanded-story-text" class="info-box"></div>
+            </div>
+
+            <!-- Story Beats Display -->
+            <div id="story-beats-box" class="story-box hidden">
+                <h3>스토리 비트 (주요 장면 구조)</h3>
+                <div id="story-beats-content" class="beats-timeline"></div>
+            </div>
+
+            <!-- Character Sheets Display -->
+            <div id="character-sheets-box" class="story-box hidden">
+                <h3>캐릭터 시트</h3>
+                <div id="character-sheets-content" class="character-grid"></div>
             </div>
 
             <div class="button-group">

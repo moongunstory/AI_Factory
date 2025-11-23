@@ -126,11 +126,12 @@ def generate_prompts():
     try:
         data = request.get_json()
         expanded_story = data.get('expanded_story', '').strip()
+        theme = data.get('theme', 'cinematic_realism').strip()
 
         if not expanded_story:
             return jsonify({'error': '확장된 이야기가 없습니다'}), 400
 
-        logger.info("Generating advanced scene prompts (20-25 scenes)...")
+        logger.info(f"Generating advanced scene prompts (20-25 scenes) with theme: {theme}...")
 
         comp = get_components()
         advanced_gen = comp['advanced_generator']
@@ -145,7 +146,7 @@ def generate_prompts():
         character_sheets = advanced_gen.generate_character_sheet(
             expanded_story,
             story_beats,
-            theme="cinematic_realism",
+            theme=theme,
             temperature=0.6
         )
 
@@ -155,7 +156,7 @@ def generate_prompts():
             expanded_story,
             story_beats,
             character_sheets,
-            theme="cinematic_realism",
+            theme=theme,
             target_duration=60.0,
             temperature=0.7
         )
@@ -184,12 +185,15 @@ def generate_prompts():
         session['prompts_data'] = prompts_data
         session['story_beats'] = story_beats
         session['character_sheets'] = character_sheets
+        session['theme'] = theme
 
         logger.info(f"Generated {len(scenes)} scenes successfully")
 
         return jsonify({
             'success': True,
-            'prompts_data': prompts_data
+            'prompts_data': prompts_data,
+            'story_beats': story_beats,
+            'character_sheets': character_sheets
         })
 
     except Exception as e:
@@ -243,11 +247,12 @@ def regenerate_scenes():
     try:
         data = request.get_json()
         scenes_to_regenerate = data.get('scenes', [])
+        theme = data.get('theme', session.get('theme', 'cinematic_realism'))
 
         if not scenes_to_regenerate:
             return jsonify({'error': '재생성할 장면이 없습니다'}), 400
 
-        logger.info(f"Regenerating {len(scenes_to_regenerate)} scenes with advanced generator...")
+        logger.info(f"Regenerating {len(scenes_to_regenerate)} scenes with theme: {theme}...")
 
         comp = get_components()
         advanced_gen = comp['advanced_generator']
@@ -255,7 +260,6 @@ def regenerate_scenes():
 
         # Get character sheets and global style from session
         character_sheets = session.get('character_sheets', {'characters': []})
-        theme = "cinematic_realism"
         global_style = VisualStyleDefinitions.get_global_style_prompt(theme)
 
         regenerated_scenes = []
