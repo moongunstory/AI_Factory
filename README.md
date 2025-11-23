@@ -1,229 +1,166 @@
-# AI Short Factory
+# 🎬 AI Short Factory
 
-AI 기반 쇼츠 영상 자동 생성 파이프라인
+간단한 아이디어를 1-2분 쇼츠 영상용 Stable Diffusion 프롬프트로 자동 변환하는 도구
+
+## 📖 개요
+
+AI Short Factory는 간단한 이야기 아이디어를 받아서:
+1. **이야기 확장**: 1-2분 분량의 완성된 쇼츠 스토리로 확장
+2. **장면 구성**: AI가 최적의 장면 개수를 판단하고 분할
+3. **프롬프트 생성**: 각 장면마다 Stable Diffusion 이미지 생성 프롬프트 생성
+4. **번역 제공**: 영어 프롬프트와 한국어 번역 동시 제공
+
+## ✨ 주요 기능
+
+- 🤖 **로컬 LLM 사용**: llama.cpp 기반 로컬 모델로 프라이버시 보장
+- 🎨 **Stable Diffusion 프롬프트**: 고품질 이미지 생성을 위한 전문 프롬프트
+- 🌐 **웹 UI**: Streamlit 기반 사용자 친화적 인터페이스
+- 🔄 **재생성 기능**: 원하는 장면만 선택적으로 재생성 가능
+- 🇰🇷 **한국어 지원**: 전체 프로세스 한국어 지원
 
 ## 📁 프로젝트 구조
 
 ```
 AI_Short_Factory/
-├── src/                    # 파이썬 모듈
-│   ├── generators/        # AI 생성 모듈
-│   │   ├── llm.py        # LLM (llama.cpp)
-│   │   ├── image.py      # 이미지 생성 (ComfyUI) [예정]
-│   │   ├── audio.py      # 오디오 생성 [예정]
-│   │   └── video.py      # 비디오 생성 (WAN2.2) [예정]
-│   │
-│   ├── processors/        # 후처리/편집
-│   │   └── video_editor.py [예정]
-│   │
-│   ├── publishers/        # SNS 업로드
-│   │   └── sns.py [예정]
-│   │
-│   ├── pipeline/          # 워크플로우
-│   │   ├── story_to_prompts.py  # 스토리 → 프롬프트 변환
-│   │   └── orchestrator.py [예정]
-│   │
-│   └── common/            # 공통 유틸
-│       ├── config.py      # 설정 관리
-│       └── logger.py      # 로깅
-│
-├── engine/                # LLM 엔진
-│   └── llama.cpp/         # llama.cpp 빌드
-│
-├── models/                # AI 모델
-│   ├── llama-3.1-8b/      # LLM 모델
-│   ├── wan2/              # WAN2.2 [예정]
-│   ├── comfyui/           # ComfyUI [예정]
-│   └── audio/             # 오디오 모델 [예정]
-│
-└── output/                # 생성된 결과물
-    ├── clips/             # 비디오 클립
-    ├── images/            # 이미지
-    ├── prompts/           # 생성된 프롬프트
-    └── logs/              # 로그 파일
+├── app.py                      # Streamlit 웹 UI
+├── run.sh                      # 실행 스크립트
+├── requirements.txt            # Python 의존성
+├── src/
+│   ├── pipeline/
+│   │   ├── story_expander.py   # 이야기 확장 모듈
+│   │   ├── prompt_generator.py # 프롬프트 생성 모듈
+│   │   └── translator.py       # 번역 모듈
+│   ├── generators/
+│   │   └── llm.py             # LLM 클라이언트 (llama.cpp)
+│   └── common/
+│       ├── config.py          # 설정
+│       └── logger.py          # 로깅
+├── models/                    # GGUF 모델 파일 위치
+└── bin/                       # llama-cli 실행 파일 위치
 ```
 
-## 🚀 현재 구현된 기능
+## 🚀 시작하기
 
-### 1. Story to Prompts (스토리 → 프롬프트 변환)
+### 1. 필요한 것
 
-이야기를 입력하면 AI가 자동으로 쇼츠 영상용 프롬프트를 생성합니다.
+- Python 3.11+
+- llama.cpp (llama-cli 실행 파일)
+- GGUF 형식의 LLM 모델
 
-**생성되는 내용:**
-- 씬별 이미지 생성 프롬프트
-- 나레이션 텍스트
-- 배경음악 무드
-- 영상 구성 메타데이터
-
-## 📋 사전 준비
-
-### 1. llama.cpp 설치 및 빌드
+### 2. 설치
 
 ```bash
-# llama.cpp 클론 및 빌드
-cd engine
-git clone https://github.com/ggerganov/llama.cpp.git
+# 의존성 설치
+pip install -r requirements.txt
+
+# llama.cpp 빌드 (아직 없다면)
+git clone https://github.com/ggerganov/llama.cpp
 cd llama.cpp
-mkdir build && cd build
-cmake ..
-cmake --build . --config Release
-
-# 빌드 확인
-./bin/llama-cli --version
+make
+# llama-cli를 AI_Short_Factory/bin/ 에 복사
 ```
 
-### 2. LLM 모델 다운로드
+### 3. 모델 준비
+
+GGUF 형식의 모델을 다운로드하고 `models/` 디렉토리에 배치:
+```bash
+mkdir -p models
+# 예: Llama, Mistral, Qwen 등의 GGUF 모델 다운로드
+# models/model-q4_K_M.gguf 경로에 배치
+```
+
+### 4. 실행
 
 ```bash
-# 모델 디렉토리로 이동
-cd models/llama-3.1-8b
-
-# GGUF 모델 다운로드 (예: Hugging Face)
-# 예시: llama-3.1-8b-instruct.Q4_K_M.gguf
+./run.sh
 ```
 
-**추천 모델:**
-- Llama 3.1 8B Instruct (Q4_K_M 양자화)
-- Mistral 7B Instruct
-- Qwen 2.5 7B Instruct
-
-### 3. Python 가상환경 설정
+또는
 
 ```bash
-# 가상환경 활성화
-source .venv/bin/activate
-
-# 필요한 패키지 설치 (현재는 기본 라이브러리만 사용)
-# 추후 requirements.txt 추가 예정
+streamlit run app.py
 ```
 
-## 💻 사용법
+브라우저에서 `http://localhost:8501` 로 접속
 
-### CLI로 사용
+## 📝 사용 방법
 
+### 워크플로우
+
+1. **이야기 아이디어 입력**
+   - 간단한 이야기 아이디어를 텍스트로 입력
+   - 예: "우주 정거장에서 깨어난 로봇이 인류의 마지막 메시지를 찾는 이야기"
+
+2. **이야기 확장**
+   - "🚀 이야기 확장" 버튼 클릭
+   - AI가 1-2분 분량의 완성된 스토리로 확장
+   - 마음에 들지 않으면 "🔄 재시도" 버튼으로 다시 생성
+
+3. **프롬프트 생성**
+   - "✅ 컨펌" 버튼으로 확정
+   - AI가 장면 개수를 판단하고 각 장면의 프롬프트 생성
+   - 영어 원본 + 한국어 번역 동시 제공
+
+4. **선택적 재생성**
+   - 각 장면 옆 체크박스로 재생성할 장면 선택
+   - "🔄 선택한 N개 장면 재생성" 버튼 클릭
+
+## ⚙️ 설정
+
+`src/common/config.py`에서 다음 설정 변경 가능:
+
+- `LLM_MODEL_NAME`: 사용할 GGUF 모델 파일명
+- `LLM_TEMPERATURE`: 창의성 수준 (0.0-1.0)
+- `LLM_MAX_TOKENS`: 최대 생성 토큰 수
+- `LLAMA_CPP_PATH`: llama-cli 실행 파일 경로
+
+## 🎯 출력 형식
+
+각 장면은 다음 정보를 포함:
+
+- **장면 번호**: 순서
+- **장면 설명 (한국어)**: 시각적 설명
+- **Stable Diffusion 프롬프트 (영어)**: 이미지 생성용 상세 프롬프트
+- **한국어 번역**: 프롬프트의 한국어 버전
+- **길이**: 장면 지속 시간 (초)
+
+### Stable Diffusion 프롬프트 예시
+
+```
+a lonely robot in abandoned space station, dark corridor,
+blue emergency lights, cinematic lighting, detailed mechanical parts,
+sci-fi atmosphere, digital art, highly detailed, 4k, masterpiece
+```
+
+## 🔧 트러블슈팅
+
+### llama-cli not found
 ```bash
-# 기본 사용
-python -m src "용감한 기사가 산속에서 드래곤과 싸웁니다"
-
-# 파일에서 읽기
-python -m src --file story.txt
-
-# 스타일 지정
-python -m src "우주 모험 이야기" --style anime --duration 30
-
-# 상세 로그 출력
-python -m src "판타지 모험" --style cinematic --verbose
+# llama.cpp를 빌드하고 bin/ 디렉토리에 복사
+cd llama.cpp && make
+cp llama-cli /path/to/AI_Short_Factory/bin/
 ```
 
-### Python 코드에서 사용
-
-```python
-from src import create_prompts_from_story
-
-story = "어느 날, 작은 로봇이 버려진 도시를 발견했습니다..."
-
-result = create_prompts_from_story(
-    story=story,
-    style="3d",
-    duration=25.0
-)
-
-# 생성된 씬 정보
-for scene in result["scenes"]:
-    print(f"Scene {scene['scene_number']}: {scene['description']}")
-    print(f"Image Prompt: {scene['image_prompt']}")
-    print(f"Narration: {scene['narration']}")
-    print()
-```
-
-## 📤 출력 예시
-
-```json
-{
-  "scenes": [
-    {
-      "scene_number": 1,
-      "description": "Knight confronting dragon",
-      "image_prompt": "Epic cinematic shot, brave knight in shining armor facing massive red dragon, misty mountain peak, dramatic lighting, fantasy art style, 4k quality",
-      "duration": 4.0,
-      "narration": "In the heart of the ancient mountains, a hero rises.",
-      "audio_mood": "epic"
-    },
-    ...
-  ],
-  "metadata": {
-    "title": "The Dragon Slayer",
-    "total_duration": 20.0,
-    "style": "cinematic",
-    "target_platform": "shorts"
-  }
-}
-```
-
-결과는 `output/prompts/prompts_YYYYMMDD_HHMMSS.json`에 저장됩니다.
-
-## 🔧 설정
-
-`src/common/config.py`에서 설정을 변경할 수 있습니다:
-
-```python
-# LLM 파라미터
-LLM_TEMPERATURE = 0.7      # 창의성 (0.0-1.0)
-LLM_MAX_TOKENS = 2048      # 최대 생성 토큰
-LLM_TOP_P = 0.9            # Top-p 샘플링
-LLM_THREADS = 4            # CPU 스레드 수
-```
-
-환경변수로도 설정 가능:
-
+### Model not found
 ```bash
-export LLM_TEMPERATURE=0.8
-export LLM_MAX_TOKENS=4096
-export LLM_THREADS=8
+# models/ 디렉토리 확인
+ls models/
+# GGUF 모델이 있는지 확인하고 config.py의 LLM_MODEL_NAME 업데이트
 ```
 
-## 🛣️ 로드맵
+### Out of memory
+- 더 작은 quantization 모델 사용 (Q4_K_M 대신 Q4_0)
+- `LLM_MAX_TOKENS` 값 줄이기
+- `LLM_THREADS` 값 조정
 
-- [x] Story to Prompts 변환
-- [ ] ComfyUI 이미지 생성 통합
-- [ ] WAN2.2 이미지→영상 변환
-- [ ] 오디오 생성 (TTS + BGM)
-- [ ] 자동 영상 편집
-- [ ] SNS 자동 업로드 (YouTube Shorts, TikTok, Instagram)
-- [ ] Web UI 개발
-
-## 🐛 트러블슈팅
-
-### llama.cpp 실행 오류
-
-```bash
-# 빌드 경로 확인
-ls engine/llama.cpp/build/bin/llama-cli
-
-# 실행 권한 확인
-chmod +x engine/llama.cpp/build/bin/llama-cli
-```
-
-### 모델 파일을 찾을 수 없음
-
-```bash
-# 모델 디렉토리 확인
-ls models/llama-3.1-8b/*.gguf
-
-# Config.get_model_file()은 첫 번째 .gguf 파일을 자동으로 찾습니다
-```
-
-### JSON 파싱 오류
-
-LLM이 JSON 형식을 잘 따르지 않을 때:
-- 더 큰 모델 사용 (8B → 13B)
-- Temperature 낮추기 (0.7 → 0.5)
-- 프롬프트에 "ONLY JSON" 강조
-
-## 📝 라이선스
+## 📄 라이선스
 
 MIT License
 
 ## 🤝 기여
 
-이슈와 PR은 언제나 환영합니다!
+Issues와 Pull Requests를 환영합니다!
+
+## 📧 문의
+
+프로젝트 관련 문의사항은 Issues를 통해 남겨주세요.
