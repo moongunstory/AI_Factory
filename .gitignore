@@ -1,0 +1,6 @@
+models/
+*.pth
+*.bin
+*.model
+*.safetensors
+*.chk
