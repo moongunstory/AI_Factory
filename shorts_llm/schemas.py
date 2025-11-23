@@ -6,7 +6,7 @@ Defines all Pydantic models for structured data through the 3-stage pipeline:
 - Stage 2: Scene & Shot Planning
 - Stage 3: Final Prompts for generation
 """
-
+from typing import Any
 from typing import Literal
 from pydantic import BaseModel, Field
 
