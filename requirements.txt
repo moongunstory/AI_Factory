@@ -1,0 +1,12 @@
+# AI Shorts Factory - LLM Pipeline Dependencies
+# Python 3.11+ required
+
+# Core dependencies
+pydantic>=2.0.0,<3.0.0       # Data validation and schema definition
+requests>=2.31.0,<3.0.0      # HTTP client for LLM API calls
+
+# Optional development dependencies (install with: pip install -r requirements-dev.txt)
+# pytest>=7.0.0              # Testing framework
+# black>=23.0.0              # Code formatting
+# mypy>=1.0.0                # Type checking
+# ruff>=0.1.0                # Linting
