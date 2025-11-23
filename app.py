@@ -325,7 +325,9 @@ def regenerate_selected_prompts(selected_shot_ids: List[str]) -> str:
 def create_ui():
     """Gradio UI 생성"""
 
-    with gr.Blocks(title="AI Shorts Factory", theme=gr.themes.Soft()) as app:
+    # Create the Gradio interface
+    # Note: theme parameter removed for compatibility with different Gradio versions
+    with gr.Blocks(title="AI Shorts Factory") as app:
         gr.Markdown("""
         # 🎬 AI Shorts Factory
         ### 간단한 아이디어에서 완성된 영상 시나리오까지
