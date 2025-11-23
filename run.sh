@@ -1,39 +1,39 @@
 #!/bin/bash
 
-# AI Short Factory - Run Script
+# AI Short Factory - 실행 스크립트
 
 echo "==========================================="
-echo " 🎬 AI Short Factory - Web UI Launcher"
+echo " AI Short Factory - 웹 UI 실행"
 echo "==========================================="
 echo ""
 
-# Check if streamlit is installed
+# Streamlit 설치 확인
 if ! command -v streamlit &> /dev/null; then
-    echo "❌ Streamlit is not installed"
-    echo "Installing requirements..."
+    echo "[오류] Streamlit이 설치되어 있지 않습니다"
+    echo "필요한 패키지를 설치합니다..."
     pip install -r requirements.txt
     echo ""
 fi
 
-# Check if llama.cpp model exists
+# LLaMA 모델 파일 확인
 if [ ! -f "models/model-q4_K_M.gguf" ]; then
-    echo "⚠️  Warning: LLaMA model not found at models/model-q4_K_M.gguf"
-    echo "Please download a GGUF model and place it in the models/ directory"
+    echo "[경고] LLaMA 모델을 찾을 수 없습니다: models/model-q4_K_M.gguf"
+    echo "GGUF 모델을 다운로드하여 models/ 디렉토리에 배치하세요"
     echo ""
 fi
 
-# Check if llama-cli exists
+# llama-cli 실행 파일 확인
 if [ ! -f "bin/llama-cli" ]; then
-    echo "⚠️  Warning: llama-cli not found at bin/llama-cli"
-    echo "Please build llama.cpp and place llama-cli in the bin/ directory"
+    echo "[경고] llama-cli를 찾을 수 없습니다: bin/llama-cli"
+    echo "llama.cpp를 빌드하고 llama-cli를 bin/ 디렉토리에 배치하세요"
     echo ""
 fi
 
-echo "🚀 Starting Streamlit web UI..."
-echo "📱 The app will open in your browser at http://localhost:8501"
+echo "Streamlit 웹 UI를 시작합니다..."
+echo "브라우저에서 http://localhost:8501 주소로 접속하세요"
 echo ""
-echo "Press Ctrl+C to stop the server"
+echo "종료하려면 Ctrl+C를 누르세요"
 echo ""
 
-# Run streamlit
-streamlit run app.py
+# Streamlit 실행
+streamlit run src/app.py
