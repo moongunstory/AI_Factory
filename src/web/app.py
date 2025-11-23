@@ -12,6 +12,8 @@ sys.path.insert(0, str(project_root))
 
 from src.pipeline.story_expander import StoryExpander
 from src.pipeline.prompt_generator import PromptGenerator
+from src.pipeline.advanced_scene_generator import AdvancedSceneGenerator
+from src.pipeline.visual_styles import VisualStyleDefinitions
 from src.pipeline.translator import Translator
 from src.common.logger import setup_logger
 from src.common.json_utils import safe_parse
@@ -34,6 +36,7 @@ def get_components():
         components = {
             'expander': StoryExpander(),
             'generator': PromptGenerator(),
+            'advanced_generator': AdvancedSceneGenerator(),
             'translator': Translator()
         }
     return components
@@ -119,7 +122,7 @@ def expand_story():
 
 @app.route('/api/generate-prompts', methods=['POST'])
 def generate_prompts():
-    """Generate scene prompts from expanded story."""
+    """Generate scene prompts from expanded story using advanced scene generator."""
     try:
         data = request.get_json()
         expanded_story = data.get('expanded_story', '').strip()
@@ -127,24 +130,62 @@ def generate_prompts():
         if not expanded_story:
             return jsonify({'error': '확장된 이야기가 없습니다'}), 400
 
-        logger.info("Generating prompts...")
+        logger.info("Generating advanced scene prompts (20-25 scenes)...")
 
         comp = get_components()
-
-        # Generate prompts
-        prompts_data = comp['generator'].generate(expanded_story)
-
-        # Translate each prompt to Korean
+        advanced_gen = comp['advanced_generator']
         translator = comp['translator']
-        for scene in prompts_data.get('scenes', []):
+
+        # Step 1: Generate story beats
+        logger.info("Step 1: Generating story beats...")
+        story_beats = advanced_gen.generate_story_beats(expanded_story, temperature=0.7)
+
+        # Step 2: Generate character sheets
+        logger.info("Step 2: Generating character sheets...")
+        character_sheets = advanced_gen.generate_character_sheet(
+            expanded_story,
+            story_beats,
+            theme="cinematic_realism",
+            temperature=0.6
+        )
+
+        # Step 3: Generate 20-25 scenes
+        logger.info("Step 3: Generating 20-25 scenes...")
+        scenes_result = advanced_gen.generate_scenes(
+            expanded_story,
+            story_beats,
+            character_sheets,
+            theme="cinematic_realism",
+            target_duration=60.0,
+            temperature=0.7
+        )
+
+        # Format scenes for frontend compatibility
+        scenes = scenes_result.get('scenes', [])
+        for scene in scenes:
+            # Add description_kr (Korean description) for frontend compatibility
+            scene['description_kr'] = scene.get('description', '')
+
+            # Translate English prompt to Korean
             prompt_en = scene.get('prompt_en', '')
             if prompt_en:
                 scene['prompt_kr'] = translator.translate(prompt_en)
             else:
                 scene['prompt_kr'] = ''
 
-        # Store in session
+        # Prepare final prompts data
+        prompts_data = {
+            'scenes': scenes,
+            'total_scenes': len(scenes),
+            'estimated_duration': scenes_result.get('total_duration', 0)
+        }
+
+        # Store in session for regeneration
         session['prompts_data'] = prompts_data
+        session['story_beats'] = story_beats
+        session['character_sheets'] = character_sheets
+
+        logger.info(f"Generated {len(scenes)} scenes successfully")
 
         return jsonify({
             'success': True,
@@ -198,7 +239,7 @@ def regenerate_scene():
 
 @app.route('/api/regenerate-scenes', methods=['POST'])
 def regenerate_scenes():
-    """Regenerate multiple selected scenes."""
+    """Regenerate multiple selected scenes using advanced scene generator."""
     try:
         data = request.get_json()
         scenes_to_regenerate = data.get('scenes', [])
@@ -206,11 +247,16 @@ def regenerate_scenes():
         if not scenes_to_regenerate:
             return jsonify({'error': '재생성할 장면이 없습니다'}), 400
 
-        logger.info(f"Regenerating {len(scenes_to_regenerate)} scenes...")
+        logger.info(f"Regenerating {len(scenes_to_regenerate)} scenes with advanced generator...")
 
         comp = get_components()
-        generator = comp['generator']
+        advanced_gen = comp['advanced_generator']
         translator = comp['translator']
+
+        # Get character sheets and global style from session
+        character_sheets = session.get('character_sheets', {'characters': []})
+        theme = "cinematic_realism"
+        global_style = VisualStyleDefinitions.get_global_style_prompt(theme)
 
         regenerated_scenes = []
 
@@ -218,13 +264,19 @@ def regenerate_scenes():
             scene_number = scene_info.get('scene_number')
             scene_description = scene_info.get('scene_description', '')
 
-            # Regenerate this scene
-            new_scene = generator.regenerate_scene(
+            # Regenerate this scene with advanced generator
+            new_scene = advanced_gen.regenerate_scene(
                 scene_number=scene_number,
-                scene_description=scene_description
+                scene_description=scene_description,
+                character_sheets=character_sheets,
+                global_style=global_style,
+                temperature=0.7
             )
 
-            # Translate
+            # Add description_kr for frontend compatibility
+            new_scene['description_kr'] = new_scene.get('description', scene_description)
+
+            # Translate English prompt to Korean
             prompt_en = new_scene.get('prompt_en', '')
             if prompt_en:
                 new_scene['prompt_kr'] = translator.translate(prompt_en)
