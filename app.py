@@ -415,34 +415,55 @@ def main():
     import subprocess
     import time
     import sys
+    import os
 
     print("=" * 80)
     print("🎬 AI SHORTS FACTORY - WEB UI")
     print("=" * 80)
 
-    # LLM 서버 확인
+    # LLM 서버 확인 (재시도 로직 포함)
     print("\n🔌 LLM 서버 연결 확인 중...")
 
-    try:
-        response = chat_completion(
-            system_prompt="You are a helpful assistant.",
-            user_prompt="Say 'OK'",
-            max_tokens=5,
-            base_url="http://localhost:8080/v1"
-        )
-        print("✅ LLM 서버 연결 성공!")
-    except Exception as e:
-        print("❌ LLM 서버에 연결할 수 없습니다!")
-        print(f"   에러: {e}")
-        print("\n서버를 먼저 실행하세요:")
-        print("   ./llama.cpp/build/bin/llama-server --model models/llama-3.1-8b-instruct/Llama3.1-8B-Instruct --port 8080")
+    max_retries = 5
+    retry_delay = 2
+    server_ready = False
 
-        print("\n웹 UI를 계속 시작하시겠습니까? (서버는 나중에 시작할 수 있습니다) (Y/n): ", end="")
-        answer = input().strip().lower()
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = chat_completion(
+                system_prompt="You are a helpful assistant.",
+                user_prompt="Say 'OK'",
+                max_tokens=5,
+                base_url="http://localhost:8080/v1"
+            )
+            print("✅ LLM 서버 연결 성공!")
+            server_ready = True
+            break
+        except Exception as e:
+            if attempt < max_retries:
+                print(f"⏳ 서버 연결 시도 {attempt}/{max_retries}... {retry_delay}초 후 재시도")
+                time.sleep(retry_delay)
+            else:
+                print("❌ LLM 서버에 연결할 수 없습니다!")
+                print(f"   에러: {e}")
+                print("\n서버를 먼저 실행하세요:")
+                print("   ./llama.cpp/build/bin/llama-server --model models/llama-3.1-8b-instruct/Llama3.1-8B-Instruct --port 8080")
 
-        if answer == 'n':
-            print("종료합니다.")
-            sys.exit(1)
+                # stdin이 tty인지 확인 (대화형 모드인지)
+                if sys.stdin.isatty():
+                    print("\n웹 UI를 계속 시작하시겠습니까? (서버는 나중에 시작할 수 있습니다) (Y/n): ", end="")
+                    try:
+                        answer = input().strip().lower()
+                        if answer == 'n':
+                            print("종료합니다.")
+                            sys.exit(1)
+                    except EOFError:
+                        # EOFError 발생 시 기본값으로 진행
+                        print("\n⚠️  입력을 받을 수 없습니다. 웹 UI를 시작합니다...")
+                else:
+                    # 비대화형 모드에서는 경고만 표시하고 계속 진행
+                    print("\n⚠️  서버가 준비되지 않았지만 웹 UI를 시작합니다...")
+                    print("    서버가 시작되면 새로고침하세요.")
 
     print("\n🌐 웹 UI 시작...")
     app = create_ui()
