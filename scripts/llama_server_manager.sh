@@ -28,7 +28,7 @@ LLAMA_PARAMS=(
     --batch-size 512             # 배치 처리 효율성
     --threads 8                  # CPU 코어 활용 (시스템에 따라 조정)
     --n-gpu-layers 0             # CPU 전용
-    --n-parallel 4               # 동시 요청 4개 처리
+#    --n-parallel 4               # 동시 요청 4개 처리
     --cont-batching              # Continuous batching 활성화
     --flash-attn                 # Flash attention (속도 향상)
     --mlock                      # 메모리 고정 (스왑 방지)
