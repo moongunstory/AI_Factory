@@ -37,7 +37,7 @@ for directory in [DATA_DIR, OUTPUT_DIR, IMAGES_DIR, VIDEOS_DIR]:
 # llama.cpp, vLLM, Text Generation WebUI 등에서 제공하는 OpenAI 호환 API
 LOCAL_LLM_BASE_URL: str = os.environ.get(
     "LOCAL_LLM_BASE_URL",
-    "http://localhost:8000/v1"
+    "http://localhost:8080/v1"
 )
 
 # 기본 모델 이름 (로컬 서버에서 사용하는 식별자)

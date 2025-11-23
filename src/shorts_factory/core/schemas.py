@@ -9,7 +9,7 @@
   5. 영상 생성 준비
 """
 
-from typing import Literal
+from typing import Literal, Any
 from pydantic import BaseModel, Field
 
 
@@ -220,7 +220,7 @@ class GeneratedImage(BaseModel):
     thumbnail_path: str | None = Field(None, description="썸네일 경로")
     generation_time_seconds: float = Field(..., description="생성 소요 시간")
     seed_used: int | None = Field(None, description="사용된 시드")
-    metadata: dict[str, any] = Field(default_factory=dict, description="추가 메타데이터")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="추가 메타데이터")
 
 
 class GeneratedVideo(BaseModel):
