@@ -1,388 +1,618 @@
-// State management
-let state = {
-    simpleIdea: '',
-    expandedStory: '',
-    selectedTheme: 'cinematic_realism',
-    promptsData: null,
+/**
+ * AI Short Factory - Series Studio
+ * Main JavaScript Logic
+ */
+
+// ============================================================================
+// Global State
+// ============================================================================
+const AppState = {
+    mode: null, // 'oneshot' or 'series'
+    currentStep: 0,
+
+    // Series mode data
+    universeId: null,
+    universeName: null,
+    seriesId: null,
+    seriesName: null,
+    episodeNumber: null,
+
+    // Story data
+    storyIdea: null,
+    expandedStory: null,
     storyBeats: null,
     characterSheets: null,
-    selectedScenes: new Set()
+    theme: 'cinematic_realism',
+
+    // Generated data
+    scenes: [],
+
+    // Suggestions
+    suggestions: []
 };
 
-// Theme descriptions
-const themeDescriptions = {
-    'cinematic_realism': '자연스러운 색감과 현실적인 조명으로 영화 같은 사실적인 분위기를 연출합니다.',
-    'dark_fantasy': '깊은 보라색, 피 같은 붉은색, 어두운 그림자로 신비롭고 장엄한 다크 판타지 세계를 표현합니다.',
-    'anime': '선명한 색상과 역동적인 앵글로 일본 애니메이션 스타일을 구현합니다.',
-    'disney': '따뜻하고 생동감 있는 색채로 디즈니/픽사의 마법 같은 애니메이션 스타일을 재현합니다.',
-    'game_cinematic': '언리얼 엔진 5 퀄리티의 게임 시네마틱으로 영웅적이고 웅장한 분위기를 연출합니다.',
-    'cyber_fantasy': '네온 블루, 핫 핑크, 홀로그램 효과로 미래적이고 디스토피아적인 사이버펑크 세계를 표현합니다.',
-    'horror': '불안정한 조명과 불안한 구도로 공포스럽고 긴장감 넘치는 분위기를 조성합니다.',
-    'fantasy_adventure': '풍부한 색감과 장대한 카메라 워크로 판타지 모험의 경이로움을 담아냅니다.',
-    'sci_fi': '차갑고 깨끗한 미래적 디자인으로 첨단 과학 기술의 세계를 표현합니다.',
-    'retro_synthwave': '80년대 네온과 그라데이션으로 향수를 불러일으키는 신스웨이브 분위기를 연출합니다.'
-};
+// ============================================================================
+// Helper Functions
+// ============================================================================
 
-// DOM elements
-const elements = {
-    simpleIdea: document.getElementById('simple-idea'),
-    themeSelect: document.getElementById('theme-select'),
-    themeDescription: document.getElementById('theme-description'),
-    expandBtn: document.getElementById('expand-btn'),
-    expandLoading: document.getElementById('expand-loading'),
-    expandedSection: document.getElementById('expanded-section'),
-    expandedStoryText: document.getElementById('expanded-story-text'),
-    storyBeatsBox: document.getElementById('story-beats-box'),
-    storyBeatsContent: document.getElementById('story-beats-content'),
-    characterSheetsBox: document.getElementById('character-sheets-box'),
-    characterSheetsContent: document.getElementById('character-sheets-content'),
-    confirmBtn: document.getElementById('confirm-btn'),
-    retryStoryBtn: document.getElementById('retry-story-btn'),
-    generateLoading: document.getElementById('generate-loading'),
-    promptsSection: document.getElementById('prompts-section'),
-    promptsSummary: document.getElementById('prompts-summary'),
-    scenesContainer: document.getElementById('scenes-container'),
-    regenerateControls: document.getElementById('regenerate-controls'),
-    regenerateBtn: document.getElementById('regenerate-btn'),
-    regenerateLoading: document.getElementById('regenerate-loading'),
-    regenerateInfo: document.getElementById('regenerate-info')
-};
+function showSection(sectionId) {
+    // Hide all sections
+    document.querySelectorAll('.step-section').forEach(section => {
+        section.classList.add('hidden');
+    });
 
-// Event listeners
-elements.simpleIdea.addEventListener('input', (e) => {
-    state.simpleIdea = e.target.value.trim();
-    elements.expandBtn.disabled = !state.simpleIdea;
-});
+    // Show target section
+    const targetSection = document.getElementById(sectionId);
+    if (targetSection) {
+        targetSection.classList.remove('hidden');
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
 
-elements.themeSelect.addEventListener('change', (e) => {
-    state.selectedTheme = e.target.value;
-    elements.themeDescription.textContent = themeDescriptions[state.selectedTheme] || '';
-});
+function updateProgressBar(step) {
+    const progressBar = document.getElementById('progress-bar');
+    if (!progressBar) return;
 
-elements.expandBtn.addEventListener('click', expandStory);
-elements.retryStoryBtn.addEventListener('click', expandStory);
-elements.confirmBtn.addEventListener('click', generatePrompts);
-elements.regenerateBtn.addEventListener('click', regenerateSelectedScenes);
+    if (step === 0) {
+        progressBar.classList.add('hidden');
+        return;
+    }
 
-// API calls
-async function expandStory() {
+    progressBar.classList.remove('hidden');
+    const steps = progressBar.querySelectorAll('.progress-step');
+
+    steps.forEach((stepEl, index) => {
+        stepEl.classList.remove('active', 'completed');
+        if (index < step) {
+            stepEl.classList.add('completed');
+        } else if (index === step) {
+            stepEl.classList.add('active');
+        }
+    });
+}
+
+function showLoading(loadingId) {
+    const loading = document.getElementById(loadingId);
+    if (loading) loading.classList.remove('hidden');
+}
+
+function hideLoading(loadingId) {
+    const loading = document.getElementById(loadingId);
+    if (loading) loading.classList.add('hidden');
+}
+
+async function apiCall(url, method = 'GET', data = null) {
     try {
-        showLoading(elements.expandLoading);
-        elements.expandBtn.disabled = true;
+        const options = {
+            method,
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        };
 
-        const response = await fetch('/api/expand-story', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ simple_idea: state.simpleIdea })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || '이야기 확장 실패');
+        if (data) {
+            options.body = JSON.stringify(data);
         }
 
-        state.expandedStory = data.expanded_story;
+        const response = await fetch(url, options);
+        const result = await response.json();
+
+        if (!result.success) {
+            throw new Error(result.error || 'API 호출 실패');
+        }
+
+        return result;
+    } catch (error) {
+        console.error('API Error:', error);
+        alert(`오류: ${error.message}`);
+        throw error;
+    }
+}
+
+// ============================================================================
+// Step 0: Mode Selection
+// ============================================================================
+
+function initModeSelection() {
+    const modeButtons = document.querySelectorAll('.mode-select-btn');
+
+    modeButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const mode = btn.getAttribute('data-mode');
+            selectMode(mode);
+        });
+    });
+}
+
+function selectMode(mode) {
+    AppState.mode = mode;
+    AppState.currentStep = 1;
+
+    if (mode === 'oneshot') {
+        // Skip series setup, go directly to story input
+        showSection('step-1-story-input');
+        updateProgressBar(1);
+        // Hide suggestions for oneshot
+        document.getElementById('next-episode-suggestions').classList.add('hidden');
+    } else if (mode === 'series') {
+        // Go to series setup
+        showSection('step-0-5-series-setup');
+        loadUniverses();
+    }
+}
+
+// ============================================================================
+// Step 0.5: Series Setup
+// ============================================================================
+
+async function loadUniverses() {
+    try {
+        const result = await apiCall('/api/universes');
+        const select = document.getElementById('existing-universe-select');
+
+        select.innerHTML = '<option value="">세계관을 선택하세요</option>';
+
+        result.universes.forEach(universe => {
+            const option = document.createElement('option');
+            option.value = universe.id;
+            option.textContent = `${universe.name} (${universe.genre})`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Failed to load universes:', error);
+    }
+}
+
+function initSeriesSetup() {
+    // Universe type radio buttons
+    const universeTypeRadios = document.querySelectorAll('input[name="universe-type"]');
+    universeTypeRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            if (e.target.value === 'new') {
+                document.getElementById('new-universe-form').classList.remove('hidden');
+                document.getElementById('existing-universe-form').classList.add('hidden');
+            } else {
+                document.getElementById('new-universe-form').classList.add('hidden');
+                document.getElementById('existing-universe-form').classList.remove('hidden');
+            }
+        });
+    });
+
+    // Series type radio buttons
+    const seriesTypeRadios = document.querySelectorAll('input[name="series-type"]');
+    seriesTypeRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            if (e.target.value === 'new') {
+                document.getElementById('new-series-form').classList.remove('hidden');
+                document.getElementById('existing-series-form').classList.add('hidden');
+            } else {
+                document.getElementById('new-series-form').classList.add('hidden');
+                document.getElementById('existing-series-form').classList.remove('hidden');
+            }
+        });
+    });
+
+    // Next button
+    document.getElementById('series-setup-next-btn').addEventListener('click', async () => {
+        await proceedFromSeriesSetup();
+    });
+
+    // Back button
+    document.getElementById('series-setup-back-btn').addEventListener('click', () => {
+        showSection('step-0-mode-selection');
+        AppState.mode = null;
+    });
+}
+
+async function proceedFromSeriesSetup() {
+    const universeType = document.querySelector('input[name="universe-type"]:checked').value;
+
+    if (universeType === 'new') {
+        // Create new universe
+        const name = document.getElementById('new-universe-name').value.trim();
+        const genre = document.getElementById('new-universe-genre').value;
+        const background = document.getElementById('new-universe-background').value.trim();
+        const styleLock = document.getElementById('new-universe-style-lock').checked;
+
+        if (!name) {
+            alert('세계관 이름을 입력해주세요');
+            return;
+        }
+
+        try {
+            const universeId = name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+            const result = await apiCall('/api/universes', 'POST', {
+                universe_id: universeId,
+                name,
+                genre,
+                background,
+                rules: {},
+                style_lock: styleLock ? { theme: genre, locked: true } : null
+            });
+
+            AppState.universeId = result.universe.id;
+            AppState.universeName = result.universe.name;
+        } catch (error) {
+            return;
+        }
+    } else {
+        // Use existing universe
+        const universeId = document.getElementById('existing-universe-select').value;
+        if (!universeId) {
+            alert('세계관을 선택해주세요');
+            return;
+        }
+        AppState.universeId = universeId;
+    }
+
+    // Handle series
+    const seriesType = document.querySelector('input[name="series-type"]:checked').value;
+
+    if (seriesType === 'new') {
+        const seriesName = document.getElementById('new-series-name').value.trim() || 'Season 1';
+        const seriesId = `series_${Date.now()}`;
+
+        try {
+            await apiCall(`/api/universes/${AppState.universeId}/series`, 'POST', {
+                series_id: seriesId,
+                name: seriesName,
+                description: ''
+            });
+
+            AppState.seriesId = seriesId;
+            AppState.seriesName = seriesName;
+            AppState.episodeNumber = 1;
+        } catch (error) {
+            return;
+        }
+    } else {
+        const seriesId = document.getElementById('existing-series-select').value;
+        if (!seriesId) {
+            alert('시리즈를 선택해주세요');
+            return;
+        }
+        AppState.seriesId = seriesId;
+        // TODO: Get next episode number
+        AppState.episodeNumber = 1;
+    }
+
+    // Proceed to story input with suggestions
+    showSection('step-1-story-input');
+    updateProgressBar(1);
+    await loadNextEpisodeSuggestions();
+}
+
+// ============================================================================
+// Step 1: Story Input & Suggestions
+// ============================================================================
+
+async function loadNextEpisodeSuggestions() {
+    if (AppState.mode !== 'series') return;
+
+    const suggestionsSection = document.getElementById('next-episode-suggestions');
+    suggestionsSection.classList.remove('hidden');
+
+    showLoading('suggestions-loading');
+
+    try {
+        const result = await apiCall('/api/series/next-suggestions', 'POST', {
+            universe_id: AppState.universeId,
+            series_id: AppState.seriesId
+        });
+
+        AppState.suggestions = result.suggestions;
+        displaySuggestions(result.suggestions);
+    } catch (error) {
+        console.error('Failed to load suggestions:', error);
+    } finally {
+        hideLoading('suggestions-loading');
+    }
+}
+
+function displaySuggestions(suggestions) {
+    const container = document.getElementById('suggestions-container');
+    container.innerHTML = '';
+
+    suggestions.forEach((suggestion, index) => {
+        const card = document.createElement('div');
+        card.className = 'suggestion-card';
+        card.innerHTML = `
+            <span class="suggestion-type">${getSuggestionTypeLabel(suggestion.type)}</span>
+            <div class="suggestion-title">${suggestion.title}</div>
+            <div class="suggestion-idea">${suggestion.idea}</div>
+            <div class="suggestion-focus">초점: ${suggestion.focus}</div>
+        `;
+
+        card.addEventListener('click', () => {
+            selectSuggestion(index);
+        });
+
+        container.appendChild(card);
+    });
+}
+
+function getSuggestionTypeLabel(type) {
+    const labels = {
+        'conflict': '갈등 중심',
+        'character': '캐릭터 성장',
+        'event': '사건 중심',
+        'emotion': '감정/관계',
+        'dark': '다크 루트'
+    };
+    return labels[type] || type;
+}
+
+function selectSuggestion(index) {
+    // Deselect all
+    document.querySelectorAll('.suggestion-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+
+    // Select clicked
+    document.querySelectorAll('.suggestion-card')[index].classList.add('selected');
+
+    // Fill story input
+    const suggestion = AppState.suggestions[index];
+    document.getElementById('story-idea-input').value = suggestion.idea;
+}
+
+function initStoryInput() {
+    // Enable expand button when text is entered
+    const storyInput = document.getElementById('story-idea-input');
+    storyInput.addEventListener('input', () => {
+        const expandBtn = document.getElementById('expand-story-btn');
+        expandBtn.disabled = storyInput.value.trim().length === 0;
+    });
+
+    // Expand story button
+    document.getElementById('expand-story-btn').addEventListener('click', async () => {
+        await expandStory();
+    });
+
+    // Back button
+    document.getElementById('story-back-btn').addEventListener('click', () => {
+        if (AppState.mode === 'series') {
+            showSection('step-0-5-series-setup');
+        } else {
+            showSection('step-0-mode-selection');
+        }
+    });
+
+    // Custom story button
+    const customBtn = document.getElementById('use-custom-story-btn');
+    if (customBtn) {
+        customBtn.addEventListener('click', () => {
+            document.getElementById('next-episode-suggestions').classList.add('hidden');
+        });
+    }
+}
+
+async function expandStory() {
+    const storyIdea = document.getElementById('story-idea-input').value.trim();
+    if (!storyIdea) {
+        alert('이야기 아이디어를 입력해주세요');
+        return;
+    }
+
+    AppState.storyIdea = storyIdea;
+    AppState.theme = document.getElementById('theme-select').value;
+
+    showLoading('expand-loading');
+
+    try {
+        // Step 1: Expand story
+        const expandResult = await apiCall('/api/expand-story', 'POST', {
+            simple_idea: storyIdea
+        });
+
+        AppState.expandedStory = expandResult.expanded_story;
+
+        // Step 2: Generate prompts (this includes story beats and characters)
+        const promptsResult = await apiCall('/api/generate-prompts', 'POST', {
+            expanded_story: AppState.expandedStory,
+            theme: AppState.theme
+        });
+
+        AppState.storyBeats = promptsResult.story_beats;
+        AppState.characterSheets = promptsResult.character_sheets;
+        AppState.scenes = promptsResult.prompts_data.scenes;
+
+        // Display results
         displayExpandedStory();
 
-        // Hide prompts section when regenerating story
-        elements.promptsSection.classList.add('hidden');
-
-        // Hide story beats and character sheets until new prompts are generated
-        elements.storyBeatsBox.classList.add('hidden');
-        elements.characterSheetsBox.classList.add('hidden');
+        // Move to next step
+        AppState.currentStep = 2;
+        showSection('step-2-story-expanded');
+        updateProgressBar(2);
 
     } catch (error) {
-        alert(`오류: ${error.message}`);
-        console.error('Expand story error:', error);
+        console.error('Story expansion failed:', error);
     } finally {
-        hideLoading(elements.expandLoading);
-        elements.expandBtn.disabled = false;
+        hideLoading('expand-loading');
     }
 }
 
-async function generatePrompts() {
-    try {
-        showLoading(elements.generateLoading);
-        elements.confirmBtn.disabled = true;
-
-        const response = await fetch('/api/generate-prompts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                expanded_story: state.expandedStory,
-                theme: state.selectedTheme
-            })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || '프롬프트 생성 실패');
-        }
-
-        state.promptsData = data.prompts_data;
-        state.storyBeats = data.story_beats;
-        state.characterSheets = data.character_sheets;
-        state.selectedScenes.clear();
-
-        displayStoryBeats();
-        displayCharacterSheets();
-        displayPrompts();
-
-    } catch (error) {
-        alert(`오류: ${error.message}`);
-        console.error('Generate prompts error:', error);
-    } finally {
-        hideLoading(elements.generateLoading);
-        elements.confirmBtn.disabled = false;
-    }
-}
-
-async function regenerateSelectedScenes() {
-    if (state.selectedScenes.size === 0) return;
-
-    try {
-        showLoading(elements.regenerateLoading);
-        elements.regenerateBtn.disabled = true;
-
-        // Prepare scenes data
-        const scenesToRegenerate = [];
-        state.promptsData.scenes.forEach(scene => {
-            if (state.selectedScenes.has(scene.scene_number)) {
-                scenesToRegenerate.push({
-                    scene_number: scene.scene_number,
-                    scene_description: scene.description_kr || ''
-                });
-            }
-        });
-
-        const response = await fetch('/api/regenerate-scenes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                scenes: scenesToRegenerate,
-                theme: state.selectedTheme
-            })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || '장면 재생성 실패');
-        }
-
-        // Update scenes in promptsData
-        data.scenes.forEach(newScene => {
-            const sceneIndex = state.promptsData.scenes.findIndex(
-                s => s.scene_number === newScene.scene_number
-            );
-            if (sceneIndex !== -1) {
-                state.promptsData.scenes[sceneIndex] = newScene;
-            }
-        });
-
-        state.selectedScenes.clear();
-        displayPrompts();
-
-    } catch (error) {
-        alert(`오류: ${error.message}`);
-        console.error('Regenerate scenes error:', error);
-    } finally {
-        hideLoading(elements.regenerateLoading);
-        elements.regenerateBtn.disabled = false;
-    }
-}
-
-// Display functions
 function displayExpandedStory() {
-    elements.expandedStoryText.textContent = state.expandedStory;
-    elements.expandedSection.classList.remove('hidden');
-    elements.expandedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
+    // Display expanded story
+    document.getElementById('expanded-story-text').textContent = AppState.expandedStory;
 
-function displayStoryBeats() {
-    if (!state.storyBeats || !state.storyBeats.beats) {
-        return;
+    // Display story beats
+    const beatsContainer = document.getElementById('story-beats-content');
+    beatsContainer.innerHTML = '';
+
+    if (AppState.storyBeats && AppState.storyBeats.beats) {
+        AppState.storyBeats.beats.forEach(beat => {
+            const beatEl = document.createElement('div');
+            beatEl.className = 'beat-item';
+            beatEl.innerHTML = `
+                <span class="beat-number">Beat ${beat.beat_number}</span>
+                <span class="beat-description">${beat.description}</span>
+                <div class="beat-function">${beat.narrative_function}</div>
+            `;
+            beatsContainer.appendChild(beatEl);
+        });
     }
 
-    const beats = state.storyBeats.beats;
-    const summary = state.storyBeats.story_summary || '';
+    // Display characters
+    const charactersContainer = document.getElementById('character-sheets-content');
+    charactersContainer.innerHTML = '';
 
-    let html = '';
-    if (summary) {
-        html += `<div class="beats-summary"><strong>전체 스토리 요약:</strong> ${summary}</div>`;
-    }
-
-    html += '<div class="beats-list">';
-    beats.forEach(beat => {
-        html += `
-            <div class="beat-item">
-                <div class="beat-number">비트 ${beat.beat_number}</div>
-                <div class="beat-content">
-                    <div class="beat-description">${beat.description}</div>
-                    <div class="beat-function">${beat.narrative_function}</div>
-                </div>
-            </div>
-        `;
-    });
-    html += '</div>';
-
-    elements.storyBeatsContent.innerHTML = html;
-    elements.storyBeatsBox.classList.remove('hidden');
-}
-
-function displayCharacterSheets() {
-    if (!state.characterSheets || !state.characterSheets.characters) {
-        return;
-    }
-
-    const characters = state.characterSheets.characters;
-
-    let html = '';
-    characters.forEach(char => {
-        html += `
-            <div class="character-card">
+    if (AppState.characterSheets && AppState.characterSheets.characters) {
+        AppState.characterSheets.characters.forEach(char => {
+            const charEl = document.createElement('div');
+            charEl.className = 'character-card';
+            charEl.innerHTML = `
                 <div class="character-name">${char.name}</div>
-                <div class="character-role">${char.role}</div>
-                <div class="character-details">
-                    <div class="character-field">
-                        <strong>외형:</strong> ${char.physical}
-                    </div>
-                    <div class="character-field">
-                        <strong>의상:</strong> ${char.costume}
-                    </div>
-                    ${char.equipment ? `
-                    <div class="character-field">
-                        <strong>장비:</strong> ${char.equipment}
-                    </div>
-                    ` : ''}
-                    <div class="character-field">
-                        <strong>시각적 특징:</strong> ${char.personality_visual}
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-
-    elements.characterSheetsContent.innerHTML = html;
-    elements.characterSheetsBox.classList.remove('hidden');
+                <span class="character-role">${char.role}</span>
+                <div class="character-detail"><strong>외형:</strong> ${char.physical}</div>
+                <div class="character-detail"><strong>복장:</strong> ${char.costume}</div>
+                ${char.equipment ? `<div class="character-detail"><strong>장비:</strong> ${char.equipment}</div>` : ''}
+            `;
+            charactersContainer.appendChild(charEl);
+        });
+    }
 }
 
-function displayPrompts() {
-    const scenes = state.promptsData.scenes || [];
-    const totalScenes = scenes.length;
-    const estimatedDuration = state.promptsData.estimated_duration || 0;
+// ============================================================================
+// Step 2: Confirm and Generate
+// ============================================================================
 
-    // Update summary with more details
-    elements.promptsSummary.innerHTML = `
+function initStoryExpanded() {
+    document.getElementById('confirm-generate-btn').addEventListener('click', () => {
+        // Scenes are already generated, just move to display
+        AppState.currentStep = 3;
+        displayScenes();
+        showSection('step-3-prompts');
+        updateProgressBar(3);
+    });
+
+    document.getElementById('story-retry-btn').addEventListener('click', () => {
+        showSection('step-1-story-input');
+        updateProgressBar(1);
+    });
+
+    document.getElementById('story-expanded-back-btn').addEventListener('click', () => {
+        showSection('step-1-story-input');
+        updateProgressBar(1);
+    });
+}
+
+// ============================================================================
+// Step 3: Display Prompts
+// ============================================================================
+
+function displayScenes() {
+    // Summary
+    const summary = document.getElementById('prompts-summary');
+    summary.innerHTML = `
+        <h3>📊 프롬프트 생성 완료</h3>
         <div class="summary-stats">
             <div class="stat-item">
-                <span class="stat-label">총 장면 수:</span>
-                <span class="stat-value">${totalScenes}개</span>
+                <div class="stat-value">${AppState.scenes.length}</div>
+                <div class="stat-label">총 장면 수</div>
             </div>
             <div class="stat-item">
-                <span class="stat-label">예상 영상 길이:</span>
-                <span class="stat-value">${estimatedDuration.toFixed(1)}초 (${Math.floor(estimatedDuration / 60)}분 ${Math.floor(estimatedDuration % 60)}초)</span>
+                <div class="stat-value">${Math.round(AppState.scenes.reduce((sum, s) => sum + (s.duration || 0), 0))}초</div>
+                <div class="stat-label">예상 길이</div>
             </div>
             <div class="stat-item">
-                <span class="stat-label">선택된 테마:</span>
-                <span class="stat-value">${themeDescriptions[state.selectedTheme]?.split('.')[0] || state.selectedTheme}</span>
+                <div class="stat-value">${AppState.characterSheets.characters.length}</div>
+                <div class="stat-label">등장 캐릭터</div>
             </div>
         </div>
     `;
 
-    // Clear and render scenes
-    elements.scenesContainer.innerHTML = '';
-    scenes.forEach(scene => {
-        const sceneCard = createSceneCard(scene);
-        elements.scenesContainer.appendChild(sceneCard);
+    // Scenes
+    const container = document.getElementById('scenes-container');
+    container.innerHTML = '';
+
+    AppState.scenes.forEach((scene, index) => {
+        const sceneEl = document.createElement('div');
+        sceneEl.className = 'scene-card';
+        sceneEl.innerHTML = `
+            <div class="scene-header">
+                <div class="scene-title">Scene ${scene.scene_number}</div>
+                <span class="scene-duration">${scene.duration}초</span>
+            </div>
+            <div class="scene-description">${scene.description || scene.description_kr || ''}</div>
+            <div class="scene-prompt">
+                <span class="prompt-label">프롬프트 (EN):</span>
+                <div class="prompt-text">${scene.prompt_en}</div>
+            </div>
+            ${scene.prompt_kr ? `
+                <div class="scene-prompt">
+                    <span class="prompt-label">프롬프트 (KR):</span>
+                    <div class="prompt-text">${scene.prompt_kr}</div>
+                </div>
+            ` : ''}
+            <div class="scene-actions">
+                <label>
+                    <input type="checkbox" class="scene-checkbox" data-scene="${index}">
+                    <span>재생성 선택</span>
+                </label>
+                <button class="btn btn-small btn-secondary" onclick="copyPrompt(${index})">복사</button>
+            </div>
+        `;
+        container.appendChild(sceneEl);
     });
 
-    // Show prompts section
-    elements.promptsSection.classList.remove('hidden');
-    elements.promptsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    // Update regenerate controls
-    updateRegenerateControls();
+    // Enable regenerate button when checkboxes are selected
+    const checkboxes = document.querySelectorAll('.scene-checkbox');
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateRegenerateButton);
+    });
 }
 
-function createSceneCard(scene) {
-    const card = document.createElement('div');
-    card.className = 'scene-card';
+function updateRegenerateButton() {
+    const checked = document.querySelectorAll('.scene-checkbox:checked');
+    const controls = document.getElementById('regenerate-controls');
 
-    const duration = scene.duration || 0;
-    const durationDisplay = duration ? `${duration.toFixed(1)}초` : '미정';
-
-    card.innerHTML = `
-        <div class="scene-header">
-            <div class="scene-title">
-                <span class="scene-number-badge">장면 ${scene.scene_number}</span>
-                <span class="scene-duration-badge">${durationDisplay}</span>
-            </div>
-        </div>
-
-        <div class="scene-content">
-            <div class="scene-description">
-                <strong>📝 장면 설명:</strong> ${scene.description_kr || 'N/A'}
-            </div>
-
-            <div class="scene-prompts">
-                <div class="prompt-box">
-                    <h4>🎨 영어 프롬프트 (Stable Diffusion)</h4>
-                    <div class="prompt-text">${scene.prompt_en || 'N/A'}</div>
-                </div>
-
-                <div class="prompt-box">
-                    <h4>🇰🇷 한국어 번역</h4>
-                    <div class="prompt-text">${scene.prompt_kr || '번역 중...'}</div>
-                </div>
-            </div>
-
-            <div class="scene-checkbox">
-                <input
-                    type="checkbox"
-                    id="scene-${scene.scene_number}"
-                    ${state.selectedScenes.has(scene.scene_number) ? 'checked' : ''}
-                    onchange="handleSceneSelection(${scene.scene_number}, this.checked)"
-                >
-                <label for="scene-${scene.scene_number}">이 장면 재생성 선택</label>
-            </div>
-        </div>
-    `;
-    return card;
-}
-
-function handleSceneSelection(sceneNumber, isChecked) {
-    if (isChecked) {
-        state.selectedScenes.add(sceneNumber);
+    if (checked.length > 0) {
+        controls.classList.remove('hidden');
     } else {
-        state.selectedScenes.delete(sceneNumber);
-    }
-    updateRegenerateControls();
-}
-
-function updateRegenerateControls() {
-    const selectedCount = state.selectedScenes.size;
-
-    if (selectedCount > 0) {
-        elements.regenerateControls.classList.remove('hidden');
-        elements.regenerateInfo.classList.add('hidden');
-        elements.regenerateBtn.textContent = `선택한 ${selectedCount}개 장면 재생성`;
-    } else {
-        elements.regenerateControls.classList.add('hidden');
-        elements.regenerateInfo.classList.remove('hidden');
+        controls.classList.add('hidden');
     }
 }
 
-// Utility functions
-function showLoading(element) {
-    element.classList.remove('hidden');
+window.copyPrompt = function(index) {
+    const scene = AppState.scenes[index];
+    const text = scene.prompt_en;
+
+    navigator.clipboard.writeText(text).then(() => {
+        alert('프롬프트가 복사되었습니다!');
+    }).catch(err => {
+        console.error('Copy failed:', err);
+    });
+};
+
+function initPromptsDisplay() {
+    document.getElementById('save-and-finish-btn').addEventListener('click', () => {
+        alert('저장되었습니다! (실제 저장 기능은 백엔드 추가 필요)');
+    });
+
+    document.getElementById('start-new-btn').addEventListener('click', () => {
+        if (confirm('새 프로젝트를 시작하시겠습니까? 현재 작업이 저장되지 않을 수 있습니다.')) {
+            location.reload();
+        }
+    });
 }
 
-function hideLoading(element) {
-    element.classList.add('hidden');
-}
+// ============================================================================
+// Initialization
+// ============================================================================
 
-// Make handleSceneSelection available globally
-window.handleSceneSelection = handleSceneSelection;
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize all sections
+    initModeSelection();
+    initSeriesSetup();
+    initStoryInput();
+    initStoryExpanded();
+    initPromptsDisplay();
+
+    // Show initial section
+    showSection('step-0-mode-selection');
+    updateProgressBar(0);
+
+    console.log('AI Short Factory - Series Studio initialized');
+});

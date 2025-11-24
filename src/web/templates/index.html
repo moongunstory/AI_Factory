@@ -3,82 +3,319 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Short Factory</title>
+    <title>AI Short Factory - Series Studio</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>AI Short Factory</h1>
-            <p class="subtitle">간단한 아이디어를 영상 프롬프트로 변환</p>
+            <h1>🎬 AI Short Factory</h1>
+            <p class="subtitle">단편부터 시리즈까지 - AI 기반 쇼츠 영상 제작 도구</p>
         </header>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar hidden" id="progress-bar">
+            <div class="progress-step" data-step="0">모드 선택</div>
+            <div class="progress-step" data-step="1">스토리</div>
+            <div class="progress-step" data-step="2">캐릭터</div>
+            <div class="progress-step" data-step="3">프롬프트</div>
+        </div>
 
         <hr>
 
-        <!-- Step 1: Story Input -->
-        <section class="step-section">
-            <h2>1. 이야기 아이디어 입력</h2>
-            <textarea
-                id="simple-idea"
-                class="story-input"
-                placeholder="예: 우주 정거장에서 깨어난 로봇이 인류의 마지막 메시지를 찾는 이야기"
-                rows="4"></textarea>
+        <!-- ============================================================ -->
+        <!-- Step 0: Mode Selection -->
+        <!-- ============================================================ -->
+        <section id="step-0-mode-selection" class="step-section">
+            <h2>📌 Step 0: 프로젝트 모드 선택</h2>
+            <p class="section-description">어떤 방식으로 제작하시겠습니까?</p>
 
-            <!-- Theme Selection -->
-            <div class="theme-selection">
-                <h3>비주얼 스타일 테마 선택</h3>
-                <select id="theme-select" class="theme-dropdown">
-                    <option value="cinematic_realism">영화적 사실주의</option>
-                    <option value="dark_fantasy">다크 판타지</option>
-                    <option value="anime">애니메이션</option>
-                    <option value="disney">디즈니</option>
-                    <option value="game_cinematic">게임 시네마틱</option>
-                    <option value="cyber_fantasy">사이버 판타지</option>
-                    <option value="horror">호러</option>
-                    <option value="fantasy_adventure">판타지 어드벤처</option>
-                    <option value="sci_fi">공상과학</option>
-                    <option value="retro_synthwave">레트로 신스웨이브</option>
-                </select>
-                <p class="theme-description" id="theme-description">
-                    자연스러운 색감과 현실적인 조명으로 영화 같은 사실적인 분위기를 연출합니다.
-                </p>
+            <div class="mode-selection-grid">
+                <div class="mode-card" id="mode-oneshot">
+                    <div class="mode-icon">🎬</div>
+                    <h3>단편 영상</h3>
+                    <p class="mode-description">빠르게 하나만 만들기</p>
+                    <ul class="mode-features">
+                        <li>✓ 세계관 저장 안 함</li>
+                        <li>✓ 캐릭터 단발성</li>
+                        <li>✓ 바로 시작 가능</li>
+                    </ul>
+                    <button class="btn btn-primary mode-select-btn" data-mode="oneshot">선택</button>
+                </div>
+
+                <div class="mode-card" id="mode-series">
+                    <div class="mode-icon">📺</div>
+                    <h3>시리즈 제작</h3>
+                    <p class="mode-description">연속된 세계관 구축</p>
+                    <ul class="mode-features">
+                        <li>✓ 세계관 DB 관리</li>
+                        <li>✓ 캐릭터 재사용</li>
+                        <li>✓ 일관성 자동 유지</li>
+                        <li>✓ 다음 화 추천</li>
+                    </ul>
+                    <button class="btn btn-primary mode-select-btn" data-mode="series">선택</button>
+                </div>
             </div>
-
-            <button id="expand-btn" class="btn btn-primary" disabled>이야기 확장</button>
-            <div id="expand-loading" class="loading hidden">이야기를 확장하는 중...</div>
         </section>
 
-        <!-- Step 2: Expanded Story Display -->
-        <section id="expanded-section" class="step-section hidden">
-            <h2>2. 확장된 이야기</h2>
+        <!-- ============================================================ -->
+        <!-- Step 0.5: Series Setup (only for series mode) -->
+        <!-- ============================================================ -->
+        <section id="step-0-5-series-setup" class="step-section hidden">
+            <h2>🌍 시리즈 설정</h2>
 
-            <div class="story-box">
-                <h3>생성된 이야기</h3>
-                <div id="expanded-story-text" class="info-box"></div>
+            <div class="form-group">
+                <label>세계관 선택</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="universe-type" value="new" checked>
+                        <span>새 세계관 만들기</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="universe-type" value="existing">
+                        <span>기존 세계관 선택</span>
+                    </label>
+                </div>
             </div>
 
-            <!-- Story Beats Display -->
-            <div id="story-beats-box" class="story-box hidden">
-                <h3>스토리 비트 (주요 장면 구조)</h3>
-                <div id="story-beats-content" class="beats-timeline"></div>
+            <!-- New Universe Form -->
+            <div id="new-universe-form" class="sub-form">
+                <h3>새 세계관 생성</h3>
+                <div class="form-group">
+                    <label>세계관 이름 *</label>
+                    <input type="text" id="new-universe-name" class="form-input"
+                           placeholder="예: 서양 판타지 - 드래곤의 세계">
+                </div>
+                <div class="form-group">
+                    <label>장르 *</label>
+                    <select id="new-universe-genre" class="form-select">
+                        <option value="dark_fantasy">다크 판타지</option>
+                        <option value="fantasy_adventure">판타지 어드벤처</option>
+                        <option value="sci_fi">공상과학</option>
+                        <option value="horror">호러</option>
+                        <option value="cyber_fantasy">사이버 판타지</option>
+                        <option value="modern_urban">현대 도시</option>
+                        <option value="historical">역사</option>
+                        <option value="post_apocalyptic">포스트 아포칼립스</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>배경 설명</label>
+                    <textarea id="new-universe-background" class="form-textarea" rows="3"
+                              placeholder="세계관의 기본 배경을 간단히 설명해주세요..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="new-universe-style-lock" checked>
+                        <span>스타일 락 활성화 (모든 에피소드에 동일한 비주얼 스타일 적용)</span>
+                    </label>
+                </div>
             </div>
 
-            <!-- Character Sheets Display -->
-            <div id="character-sheets-box" class="story-box hidden">
-                <h3>캐릭터 시트</h3>
-                <div id="character-sheets-content" class="character-grid"></div>
+            <!-- Existing Universe Selection -->
+            <div id="existing-universe-form" class="sub-form hidden">
+                <h3>기존 세계관 선택</h3>
+                <div class="form-group">
+                    <label>세계관</label>
+                    <select id="existing-universe-select" class="form-select">
+                        <option value="">로딩 중...</option>
+                    </select>
+                </div>
+                <div id="universe-summary" class="info-box hidden">
+                    <!-- Universe summary will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Series Selection -->
+            <div class="form-group" id="series-selection-group">
+                <label>시리즈</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="series-type" value="new" checked>
+                        <span>새 시리즈 시작</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="series-type" value="existing">
+                        <span>기존 시리즈 계속</span>
+                    </label>
+                </div>
+            </div>
+
+            <div id="new-series-form" class="sub-form">
+                <input type="text" id="new-series-name" class="form-input"
+                       placeholder="시리즈 이름 (예: Season 1 - 용기사의 여정)">
+            </div>
+
+            <div id="existing-series-form" class="sub-form hidden">
+                <select id="existing-series-select" class="form-select">
+                    <option value="">먼저 세계관을 선택하세요</option>
+                </select>
+                <div id="latest-episode-info" class="info-box hidden">
+                    <!-- Latest episode info will be loaded here -->
+                </div>
             </div>
 
             <div class="button-group">
-                <button id="confirm-btn" class="btn btn-primary">컨펌 (프롬프트 생성)</button>
-                <button id="retry-story-btn" class="btn btn-secondary">재시도 (이야기 다시 생성)</button>
+                <button id="series-setup-next-btn" class="btn btn-primary">다음: 스토리 입력</button>
+                <button id="series-setup-back-btn" class="btn btn-secondary">← 뒤로</button>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- Step 1: Story Input -->
+        <!-- ============================================================ -->
+        <section id="step-1-story-input" class="step-section hidden">
+            <h2>📖 Step 1: 스토리 아이디어 입력</h2>
+
+            <div id="context-info" class="info-box hidden">
+                <!-- Series context will be shown here -->
+            </div>
+
+            <!-- Next Episode Suggestions (Series mode only) -->
+            <div id="next-episode-suggestions" class="hidden">
+                <h3>💡 AI 추천: 다음 에피소드 아이디어</h3>
+                <p class="section-description">아래 후보 중 선택하거나 직접 작성하세요</p>
+
+                <div id="suggestions-loading" class="loading hidden">
+                    다음 화 아이디어를 생성하는 중...
+                </div>
+
+                <div id="suggestions-container" class="suggestions-grid">
+                    <!-- Suggestions will be loaded here -->
+                </div>
+
+                <div class="button-group">
+                    <button id="regenerate-suggestions-btn" class="btn btn-secondary">🔄 다른 아이디어 생성</button>
+                    <button id="use-custom-story-btn" class="btn btn-secondary">✍️ 직접 작성하기</button>
+                </div>
+            </div>
+
+            <!-- Story Input Form -->
+            <div id="story-input-form">
+                <div class="form-group">
+                    <label>이야기 아이디어 *</label>
+                    <textarea id="story-idea-input" class="story-input" rows="5"
+                              placeholder="예: 우주 정거장에서 깨어난 로봇이 인류의 마지막 메시지를 찾는 이야기"></textarea>
+                </div>
+
+                <!-- Story Options -->
+                <div class="story-options">
+                    <h4>⚙️ 스토리 설정 (선택사항)</h4>
+
+                    <div class="options-grid">
+                        <div class="form-group">
+                            <label>분위기</label>
+                            <select id="story-mood" class="form-select">
+                                <option value="dark">암울</option>
+                                <option value="tense">긴장감</option>
+                                <option value="emotional">감동</option>
+                                <option value="epic">서사적</option>
+                                <option value="light">가벼움</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>길이</label>
+                            <select id="story-length" class="form-select">
+                                <option value="60">중간 (60초)</option>
+                                <option value="30">짧음 (30초)</option>
+                                <option value="90">길게 (90초)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>관점</label>
+                            <select id="story-pov" class="form-select">
+                                <option value="third">3인칭</option>
+                                <option value="first">1인칭</option>
+                                <option value="mixed">혼합</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>핵심 키워드 (쉼표로 구분)</label>
+                        <input type="text" id="story-keywords" class="form-input"
+                               placeholder="예: 복수, 상실, 진실, 결의">
+                    </div>
+                </div>
+
+                <!-- Theme Selection -->
+                <div class="theme-selection">
+                    <h4>🎨 비주얼 스타일</h4>
+                    <select id="theme-select" class="theme-dropdown">
+                        <option value="cinematic_realism">영화적 사실주의</option>
+                        <option value="dark_fantasy">다크 판타지</option>
+                        <option value="anime">애니메이션</option>
+                        <option value="disney">디즈니</option>
+                        <option value="game_cinematic">게임 시네마틱</option>
+                        <option value="cyber_fantasy">사이버 판타지</option>
+                        <option value="horror">호러</option>
+                        <option value="fantasy_adventure">판타지 어드벤처</option>
+                        <option value="sci_fi">공상과학</option>
+                        <option value="retro_synthwave">레트로 신스웨이브</option>
+                    </select>
+                    <p class="theme-description" id="theme-description">
+                        자연스러운 색감과 현실적인 조명으로 영화 같은 사실적인 분위기를 연출합니다.
+                    </p>
+                    <div id="style-lock-notice" class="notice hidden">
+                        ⚠️ 이 세계관은 스타일 락이 활성화되어 있습니다. 선택한 테마가 자동 적용됩니다.
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button id="expand-story-btn" class="btn btn-primary">이야기 확장 및 분석</button>
+                <button id="story-back-btn" class="btn btn-secondary">← 뒤로</button>
+            </div>
+            <div id="expand-loading" class="loading hidden">이야기를 확장하고 분석하는 중...</div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- Step 2: Expanded Story & Character Confirmation -->
+        <!-- ============================================================ -->
+        <section id="step-2-story-expanded" class="step-section hidden">
+            <h2>✅ Step 2: 확장된 스토리 & 캐릭터 확인</h2>
+
+            <div class="story-box">
+                <h3>📜 확장된 이야기</h3>
+                <div id="expanded-story-text" class="info-box"></div>
+            </div>
+
+            <!-- Story Beats -->
+            <div id="story-beats-box" class="story-box">
+                <h3>📋 스토리 비트 (주요 장면 구조)</h3>
+                <div id="story-beats-content" class="beats-timeline"></div>
+            </div>
+
+            <!-- Character Sheets -->
+            <div id="character-sheets-box" class="story-box">
+                <h3>👥 등장 캐릭터</h3>
+                <div id="extracted-characters-info" class="info-message">
+                    AI가 자동으로 캐릭터를 추출했습니다.
+                </div>
+                <div id="character-sheets-content" class="character-grid"></div>
+            </div>
+
+            <!-- Consistency Check Results (Series mode only) -->
+            <div id="consistency-check-results" class="hidden">
+                <h3>⚠️ 일관성 체크 결과</h3>
+                <div id="consistency-content" class="info-box"></div>
+            </div>
+
+            <div class="button-group">
+                <button id="confirm-generate-btn" class="btn btn-primary">다음: 프롬프트 생성</button>
+                <button id="story-retry-btn" class="btn btn-secondary">🔄 재시도</button>
+                <button id="story-expanded-back-btn" class="btn btn-secondary">← 뒤로</button>
             </div>
             <div id="generate-loading" class="loading hidden">프롬프트를 생성하는 중...</div>
         </section>
 
-        <!-- Step 3: Prompts Display -->
-        <section id="prompts-section" class="step-section hidden">
-            <h2>3. 생성된 장면 프롬프트</h2>
+        <!-- ============================================================ -->
+        <!-- Step 3: Generated Prompts -->
+        <!-- ============================================================ -->
+        <section id="step-3-prompts" class="step-section hidden">
+            <h2>🎬 Step 3: 생성된 장면 프롬프트</h2>
 
             <div id="prompts-summary" class="prompts-summary"></div>
             <hr>
@@ -87,16 +324,21 @@
 
             <hr>
             <div id="regenerate-controls" class="hidden">
-                <button id="regenerate-btn" class="btn btn-secondary">선택한 장면 재생성</button>
+                <button id="regenerate-scenes-btn" class="btn btn-secondary">🔄 선택한 장면 재생성</button>
                 <div id="regenerate-loading" class="loading hidden">장면을 재생성하는 중...</div>
             </div>
             <div id="regenerate-info" class="info-message">
                 재생성할 장면을 선택하려면 체크박스를 체크하세요.
             </div>
+
+            <div class="button-group">
+                <button id="save-and-finish-btn" class="btn btn-primary">💾 저장 및 완료</button>
+                <button id="start-new-btn" class="btn btn-secondary">🆕 새 프로젝트 시작</button>
+            </div>
         </section>
 
         <footer>
-            <p>AI Short Factory - Powered by Local LLM (llama.cpp)</p>
+            <p>AI Short Factory - Powered by Local LLM (llama.cpp) | Series Studio v2.0</p>
         </footer>
     </div>
 
