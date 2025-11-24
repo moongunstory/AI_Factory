@@ -15,6 +15,11 @@ from src.pipeline.prompt_generator import PromptGenerator
 from src.pipeline.advanced_scene_generator import AdvancedSceneGenerator
 from src.pipeline.visual_styles import VisualStyleDefinitions
 from src.pipeline.translator import Translator
+from src.pipeline.next_episode_suggester import NextEpisodeSuggester
+from src.data.universe_manager import UniverseManager
+from src.data.character_manager import CharacterManager
+from src.data.series_manager import SeriesManager
+from src.data.timeline_manager import TimelineManager
 from src.common.logger import setup_logger
 from src.common.json_utils import safe_parse
 
@@ -33,11 +38,19 @@ def get_components():
     global components
     if components is None:
         logger.info("Initializing AI components...")
+        # Get absolute path to data directory
+        data_root = str(project_root / "data" / "universes")
+
         components = {
             'expander': StoryExpander(),
             'generator': PromptGenerator(),
             'advanced_generator': AdvancedSceneGenerator(),
-            'translator': Translator()
+            'translator': Translator(),
+            'suggester': NextEpisodeSuggester(),
+            'universe_mgr': UniverseManager(data_root),
+            'character_mgr': CharacterManager(data_root),
+            'series_mgr': SeriesManager(data_root),
+            'timeline_mgr': TimelineManager(data_root)
         }
     return components
 
@@ -297,6 +310,300 @@ def regenerate_scenes():
     except Exception as e:
         logger.error(f"Scenes regeneration failed: {e}")
         return jsonify({'error': f'장면 재생성 실패: {str(e)}'}), 500
+
+
+# ============================================================================
+# Universe Management APIs
+# ============================================================================
+
+@app.route('/api/universes', methods=['GET'])
+def list_universes():
+    """Get all universes."""
+    try:
+        comp = get_components()
+        universes = comp['universe_mgr'].list_universes()
+
+        return jsonify({
+            'success': True,
+            'universes': universes
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to list universes: {e}")
+        return jsonify({'error': f'세계관 목록 조회 실패: {str(e)}'}), 500
+
+
+@app.route('/api/universes', methods=['POST'])
+def create_universe():
+    """Create a new universe."""
+    try:
+        data = request.get_json()
+        universe_id = data.get('universe_id')
+        name = data.get('name')
+        genre = data.get('genre')
+        background = data.get('background', '')
+        rules = data.get('rules', {})
+        style_lock = data.get('style_lock')
+
+        if not all([universe_id, name, genre]):
+            return jsonify({'error': '필수 필드가 누락되었습니다'}), 400
+
+        comp = get_components()
+        universe = comp['universe_mgr'].create_universe(
+            universe_id, name, genre, background, rules, style_lock
+        )
+
+        return jsonify({
+            'success': True,
+            'universe': universe
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to create universe: {e}")
+        return jsonify({'error': f'세계관 생성 실패: {str(e)}'}), 500
+
+
+@app.route('/api/universes/<universe_id>', methods=['GET'])
+def get_universe(universe_id):
+    """Get a specific universe."""
+    try:
+        comp = get_components()
+        universe = comp['universe_mgr'].get_universe_summary(universe_id)
+
+        if not universe:
+            return jsonify({'error': '세계관을 찾을 수 없습니다'}), 404
+
+        return jsonify({
+            'success': True,
+            'universe': universe
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to get universe: {e}")
+        return jsonify({'error': f'세계관 조회 실패: {str(e)}'}), 500
+
+
+# ============================================================================
+# Character Management APIs
+# ============================================================================
+
+@app.route('/api/universes/<universe_id>/characters', methods=['GET'])
+def list_characters(universe_id):
+    """Get all characters in a universe."""
+    try:
+        comp = get_components()
+        character_type = request.args.get('type')  # Optional filter
+
+        characters = comp['character_mgr'].list_characters(universe_id, character_type)
+
+        return jsonify({
+            'success': True,
+            'characters': characters
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to list characters: {e}")
+        return jsonify({'error': f'캐릭터 목록 조회 실패: {str(e)}'}), 500
+
+
+@app.route('/api/universes/<universe_id>/characters', methods=['POST'])
+def create_character(universe_id):
+    """Create a new character."""
+    try:
+        data = request.get_json()
+
+        comp = get_components()
+        character = comp['character_mgr'].create_character(
+            universe_id=universe_id,
+            character_id=data.get('character_id'),
+            name=data.get('name'),
+            character_type=data.get('type', 'named'),
+            role=data.get('role', 'supporting'),
+            physical=data.get('physical', ''),
+            costume=data.get('costume', ''),
+            equipment=data.get('equipment', ''),
+            personality_visual=data.get('personality_visual', ''),
+            consistency_tags=data.get('consistency_tags', ''),
+            relationships=data.get('relationships'),
+            prototype_template=data.get('prototype_template')
+        )
+
+        return jsonify({
+            'success': True,
+            'character': character
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to create character: {e}")
+        return jsonify({'error': f'캐릭터 생성 실패: {str(e)}'}), 500
+
+
+# ============================================================================
+# Series/Episode Management APIs
+# ============================================================================
+
+@app.route('/api/universes/<universe_id>/series', methods=['GET'])
+def list_series(universe_id):
+    """Get all series in a universe."""
+    try:
+        comp = get_components()
+        series_list = comp['series_mgr'].list_series(universe_id)
+
+        return jsonify({
+            'success': True,
+            'series': series_list
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to list series: {e}")
+        return jsonify({'error': f'시리즈 목록 조회 실패: {str(e)}'}), 500
+
+
+@app.route('/api/universes/<universe_id>/series', methods=['POST'])
+def create_series(universe_id):
+    """Create a new series."""
+    try:
+        data = request.get_json()
+
+        comp = get_components()
+        series = comp['series_mgr'].create_series(
+            universe_id=universe_id,
+            series_id=data.get('series_id'),
+            name=data.get('name'),
+            description=data.get('description', '')
+        )
+
+        return jsonify({
+            'success': True,
+            'series': series
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to create series: {e}")
+        return jsonify({'error': f'시리즈 생성 실패: {str(e)}'}), 500
+
+
+@app.route('/api/universes/<universe_id>/episodes', methods=['GET'])
+def list_episodes(universe_id):
+    """Get all episodes in a universe."""
+    try:
+        comp = get_components()
+        series_id = request.args.get('series_id')  # Optional filter
+
+        episodes = comp['series_mgr'].list_episodes(universe_id, series_id)
+
+        return jsonify({
+            'success': True,
+            'episodes': episodes
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to list episodes: {e}")
+        return jsonify({'error': f'에피소드 목록 조회 실패: {str(e)}'}), 500
+
+
+@app.route('/api/series/next-suggestions', methods=['POST'])
+def get_next_episode_suggestions():
+    """Get AI-generated next episode suggestions."""
+    try:
+        data = request.get_json()
+        universe_id = data.get('universe_id')
+        series_id = data.get('series_id')
+
+        if not all([universe_id, series_id]):
+            return jsonify({'error': '필수 필드가 누락되었습니다'}), 400
+
+        comp = get_components()
+
+        # Get universe info
+        universe = comp['universe_mgr'].get_universe(universe_id)
+        if not universe:
+            return jsonify({'error': '세계관을 찾을 수 없습니다'}), 404
+
+        # Get latest episode
+        latest_episode = comp['series_mgr'].get_latest_episode(universe_id, series_id)
+        previous_summary = ""
+        if latest_episode:
+            previous_summary = comp['series_mgr'].get_episode_summary(
+                universe_id,
+                latest_episode['episode_number']
+            )
+
+        # Get characters
+        characters = comp['character_mgr'].list_characters(universe_id, 'named')
+        character_summaries = [
+            f"{char['name']} ({char['role']}): {char['physical']}"
+            for char in characters[:5]  # Top 5 characters
+        ]
+
+        # Get timeline
+        timeline_summary = comp['timeline_mgr'].get_timeline_summary(universe_id)
+
+        # Generate suggestions
+        suggestions = comp['suggester'].suggest_next_episodes(
+            universe_summary=universe['background'],
+            previous_episode_summary=previous_summary or "첫 에피소드",
+            character_summaries=character_summaries,
+            timeline_summary=timeline_summary,
+            genre=universe['genre']
+        )
+
+        return jsonify({
+            'success': True,
+            'suggestions': suggestions
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to generate suggestions: {e}")
+        return jsonify({'error': f'다음 화 추천 실패: {str(e)}'}), 500
+
+
+# ============================================================================
+# Timeline & Consistency Check APIs
+# ============================================================================
+
+@app.route('/api/universes/<universe_id>/timeline', methods=['GET'])
+def get_timeline(universe_id):
+    """Get timeline events."""
+    try:
+        comp = get_components()
+        timeline = comp['timeline_mgr'].get_timeline(universe_id)
+
+        return jsonify({
+            'success': True,
+            'timeline': timeline
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to get timeline: {e}")
+        return jsonify({'error': f'타임라인 조회 실패: {str(e)}'}), 500
+
+
+@app.route('/api/universes/<universe_id>/consistency-check', methods=['POST'])
+def check_consistency(universe_id):
+    """Check story consistency."""
+    try:
+        data = request.get_json()
+        proposed_story = data.get('story', '')
+        proposed_episode = data.get('episode_number', 1)
+        character_ids = data.get('character_ids', [])
+
+        comp = get_components()
+        results = comp['timeline_mgr'].check_story_consistency(
+            universe_id,
+            proposed_story,
+            proposed_episode,
+            character_ids
+        )
+
+        return jsonify({
+            'success': True,
+            'consistency': results
+        })
+
+    except Exception as e:
+        logger.error(f"Consistency check failed: {e}")
+        return jsonify({'error': f'일관성 체크 실패: {str(e)}'}), 500
 
 
 if __name__ == '__main__':
