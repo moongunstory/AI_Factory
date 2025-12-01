@@ -44,6 +44,51 @@ header h1 {
     color: #666;
 }
 
+/* Tab Navigation */
+.tab-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin: 15px 0 10px;
+    flex-wrap: wrap;
+}
+
+.tab-btn {
+    border: 2px solid #d8d8ff;
+    background: #f7f8ff;
+    color: #444;
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tab-btn.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.25);
+    border-color: transparent;
+}
+
+.tab-btn:hover {
+    transform: translateY(-1px);
+}
+
+.tab-indicator {
+    margin-right: 6px;
+}
+
+.tab-hint {
+    color: #666;
+    font-size: 0.95rem;
+}
+
+.tab-content.hidden {
+    display: none;
+}
+
 hr {
     border: none;
     border-top: 2px solid #e0e0e0;
@@ -118,6 +163,10 @@ hr {
     margin-top: 20px;
 }
 
+.meta-selection-grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
 .mode-card {
     border: 3px solid #e0e0e0;
     border-radius: 12px;
@@ -125,6 +174,10 @@ hr {
     text-align: center;
     transition: all 0.3s;
     cursor: pointer;
+}
+
+.meta-card {
+    background: #f9fbff;
 }
 
 .mode-card:hover {

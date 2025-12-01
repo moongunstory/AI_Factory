@@ -9,6 +9,7 @@
 const AppState = {
     mode: null, // 'oneshot' or 'series'
     currentStep: 0,
+    activeTab: null,
 
     // Series mode data
     universeId: null,
@@ -29,6 +30,12 @@ const AppState = {
 
     // Suggestions
     suggestions: []
+};
+
+// 탭 ID 정의 (상단 탭 UI용)
+const Tabs = {
+    CINEMATIC_STORY: 'cinematic-story',
+    TREND_MEME_META: 'trend-meme'
 };
 
 // ============================================================================
@@ -80,6 +87,70 @@ function showLoading(loadingId) {
 function hideLoading(loadingId) {
     const loading = document.getElementById(loadingId);
     if (loading) loading.classList.add('hidden');
+}
+
+// ============================================================================
+// Tab Navigation (Cinematic/Story vs Trend/Meme)
+// ============================================================================
+
+function initTabs() {
+    AppState.activeTab = Tabs.CINEMATIC_STORY; // 기본 탭은 기존 시네마틱/스토리 플로우
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetTab = btn.getAttribute('data-tab');
+            switchTab(targetTab);
+        });
+    });
+
+    // 키보드 단축키: 1/2로 탭 전환
+    document.addEventListener('keydown', (event) => {
+        if (event.key === '1') {
+            switchTab(Tabs.CINEMATIC_STORY);
+        } else if (event.key === '2') {
+            switchTab(Tabs.TREND_MEME_META);
+        }
+    });
+
+    renderTabContent();
+}
+
+function switchTab(tabId) {
+    if (!Object.values(Tabs).includes(tabId)) return;
+
+    AppState.activeTab = tabId;
+    renderTabContent();
+}
+
+function renderTabContent() {
+    const cinematicContent = document.getElementById('tab-content-cinematic');
+    const trendContent = document.getElementById('tab-content-trend');
+    const progressBar = document.getElementById('progress-bar');
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        const isActive = btn.getAttribute('data-tab') === AppState.activeTab;
+        btn.classList.toggle('active', isActive);
+        const indicator = btn.querySelector('.tab-indicator');
+        if (indicator) {
+            indicator.textContent = isActive ? '●' : '○';
+        }
+    });
+
+    if (AppState.activeTab === Tabs.CINEMATIC_STORY) {
+        cinematicContent?.classList.remove('hidden');
+        trendContent?.classList.add('hidden');
+        showSection('step-0-mode-selection');
+        updateProgressBar(AppState.currentStep || 0);
+    } else {
+        cinematicContent?.classList.add('hidden');
+        trendContent?.classList.remove('hidden');
+        progressBar?.classList.add('hidden');
+
+        // 트렌드/밈 탭 초기 화면 표시
+        document.querySelectorAll('#tab-content-trend .step-section').forEach(section => {
+            section.classList.remove('hidden');
+        });
+    }
 }
 
 async function apiCall(url, method = 'GET', data = null) {
@@ -140,6 +211,54 @@ function selectMode(mode) {
         showSection('step-0-5-series-setup');
         loadUniverses();
     }
+}
+
+// ============================================================================
+// Trend · Meme Meta Mode (신규 탭)
+// ============================================================================
+
+function initTrendMemeMode() {
+    const trendButtons = document.querySelectorAll('.trend-select-btn');
+
+    trendButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const source = btn.getAttribute('data-source');
+            handleTrendModeMenuSelection(source);
+        });
+    });
+}
+
+function handleTrendModeMenuSelection(source) {
+    // 선택된 메타 소스를 바탕으로 후속 흐름 연결
+    runTrendMemeMode(source);
+}
+
+function runTrendMemeMode(source) {
+    // TODO: 여기서 최신 메타 자동 조사 로직을 연결합니다.
+    // - 실시간 피드/랭킹/커스텀 패턴별로 크롤링·API 연동 지점 추가
+    // - 밈 패턴 추출, 클립 구조 분석, 프롬프트 자동화 파이프라인 삽입
+    // - 반복 제작용 프리셋/템플릿 저장 및 불러오기 연계
+
+    const labelMap = {
+        'live_feed': '🕒 실시간 피드',
+        'ranking': '📊 랭킹 / 인기 탭',
+        'custom_pattern': '🧬 커스텀 패턴 프리셋'
+    };
+
+    const selectionText = labelMap[source] || source;
+    const resultBox = document.getElementById('trend-selection-result');
+
+    if (resultBox) {
+        resultBox.classList.remove('hidden');
+        resultBox.innerHTML = `
+            <strong>선택:</strong> ${selectionText}<br>
+            TODO: 메타 분석 및 밈 패턴 기반 프롬프트 생성 로직을 여기에 연결합니다.<br>
+            • 실시간/랭킹 신호 수집 → 포맷 분석 → 촬영/자막/오디오 프롬프트 추천<br>
+            • 반복 제작용 템플릿/프리셋 저장소와 연동 예정
+        `;
+    }
+
+    console.log(`[Trend/Meme] Selected source: ${selectionText}`);
 }
 
 // ============================================================================
@@ -603,12 +722,14 @@ function initPromptsDisplay() {
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    initTabs();
     // Initialize all sections
     initModeSelection();
     initSeriesSetup();
     initStoryInput();
     initStoryExpanded();
     initPromptsDisplay();
+    initTrendMemeMode();
 
     // Show initial section
     showSection('step-0-mode-selection');
