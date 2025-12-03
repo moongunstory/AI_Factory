@@ -13,7 +13,7 @@ $ErrorActionPreference = "Stop"
 $PROJECT_DIR = Split-Path -Parent $PSScriptRoot
 $PID_FILE = Join-Path $PSScriptRoot ".llama_server.pid"
 $LOG_FILE = Join-Path $PROJECT_DIR "output\logs\llama_server.log"
-$MODEL_PATH = Join-Path $PROJECT_DIR "models\llama-3.1-8b\model-q4_K_M.gguf"
+$MODEL_PATH = Join-Path $PROJECT_DIR "models\solar-10.7b\solar-10.7b-instruct-v1.0.Q6_K.gguf"
 $LLAMA_SERVER = Join-Path $PROJECT_DIR "engine\llama.cpp\build\bin\Release\llama-server.exe"
 
 # 로그 디렉토리 생성

@@ -6,7 +6,7 @@ set -e
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PID_FILE="$PROJECT_DIR/scripts/.llama_server.pid"
 LOG_FILE="$PROJECT_DIR/output/logs/llama_server.log"
-MODEL_PATH="$PROJECT_DIR/models/llama-3.1-8b/model-q4_K_M.gguf"
+MODEL_PATH="$PROJECT_DIR/models/solar-10.7b/solar-10.7b-instruct-v1.0.Q6_K.gguf"
 LLAMA_SERVER="$PROJECT_DIR/engine/llama.cpp/build/bin/llama-server"
 
 mkdir -p "$(dirname "$LOG_FILE")"
