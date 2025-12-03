@@ -1,4 +1,4 @@
-# llama-server 관리 스크립트 (Windows GPU 지원)
+﻿# llama-server 관리 스크립트 (Windows GPU 지원)
 # PowerShell 7.0+ 권장
 
 param(
