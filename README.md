@@ -91,17 +91,45 @@ AI_Short_Factory/
 
 ### 2. 설치
 
+#### Python 의존성 설치
 ```bash
-# 의존성 설치
 pip install -r requirements.txt
+```
 
-# llama.cpp 빌드 (아직 없다면)
+#### llama.cpp 빌드
+
+**🎮 GPU 지원 (권장 - Windows/Linux)**
+
+GPU가 있다면 CUDA를 활성화하여 빌드하세요. **10-50배 빠릅니다!**
+
+**Windows (CUDA):**
+```powershell
+# Visual Studio 2022 및 CUDA Toolkit 12.x 필요
+git clone https://github.com/ggerganov/llama.cpp
+cd llama.cpp
+cmake -B build -DLLAMA_CUDA=ON
+cmake --build build --config Release
+
+# 빌드 완료 후 engine/llama.cpp/build/bin/Release/llama-server.exe 생성됨
+```
+
+**Linux (CUDA):**
+```bash
+git clone https://github.com/ggerganov/llama.cpp
+cd llama.cpp
+cmake -B build -DLLAMA_CUDA=ON
+cmake --build build --config Release
+```
+
+**🖥️ CPU 전용 (GPU 없을 때)**
+```bash
 git clone https://github.com/ggerganov/llama.cpp
 cd llama.cpp
 cmake -B build
 cmake --build build --config Release
-# llama-server를 PATH에 추가하거나 scripts/에서 참조
 ```
+
+빌드 후 `engine/llama.cpp/build/bin/` 경로에 `llama-server` 실행 파일이 생성됩니다.
 
 ### 3. 모델 준비
 
@@ -112,7 +140,35 @@ mkdir -p models/llama-3.1-8b
 # models/llama-3.1-8b/model-q4_K_M.gguf 경로에 배치
 ```
 
-### 4. 실행
+### 4. llama-server 실행
+
+프로젝트를 실행하기 전에 llama-server를 먼저 시작해야 합니다.
+
+**Windows:**
+```powershell
+# 서버 시작
+.\scripts\llama_server_manager.ps1 start
+
+# 상태 확인
+.\scripts\llama_server_manager.ps1 status
+
+# 서버 중지
+.\scripts\llama_server_manager.ps1 stop
+```
+
+**Linux/Mac:**
+```bash
+# 서버 시작
+./scripts/llama_server_manager.sh start
+
+# 상태 확인
+./scripts/llama_server_manager.sh status
+
+# 서버 중지
+./scripts/llama_server_manager.sh stop
+```
+
+### 5. 애플리케이션 실행
 
 #### A. 웹 UI 실행 (권장)
 ```bash
@@ -176,12 +232,48 @@ python -m src --list-themes
 
 ## ⚙️ 설정
 
-`src/common/config.py`에서 다음 설정 변경 가능:
+### 환경 변수로 설정 (권장)
 
-- `LLAMA_SERVER_URL`: llama-server URL (기본: http://127.0.0.1:8080)
-- `LLM_TEMPERATURE`: 창의성 수준 (0.0-1.0)
-- `LLM_MAX_TOKENS`: 최대 생성 토큰 수
-- `LLAMA_CTX_SIZE`: 컨텍스트 크기 (기본: 1024)
+`.env` 파일을 생성하거나 환경 변수로 설정:
+
+```bash
+# GPU 설정 (기본값)
+LLAMA_CTX_SIZE=4096              # 컨텍스트 크기
+LLAMA_BATCH_SIZE=2048            # 배치 크기
+LLAMA_N_GPU_LAYERS=-1            # GPU 레이어 수 (-1 = 모두)
+LLAMA_N_PARALLEL=8               # 동시 요청 수
+
+# LLM 파라미터
+LLM_TEMPERATURE=0.7              # 창의성 (0.0-1.0)
+LLM_MAX_TOKENS=2048              # 최대 생성 토큰
+LLM_THREADS=4                    # CPU 스레드 수
+
+# 서버 설정
+LLAMA_SERVER_HOST=127.0.0.1
+LLAMA_SERVER_PORT=8080
+```
+
+### GPU 최적화 팁
+
+**🚀 VRAM이 충분한 경우 (12GB+):**
+- `LLAMA_CTX_SIZE=8192` - 더 긴 컨텍스트
+- `LLAMA_BATCH_SIZE=4096` - 더 큰 배치
+- 더 큰 모델 사용 (Q6_K 또는 Q8_0)
+
+**⚡ VRAM이 부족한 경우 (6-8GB):**
+- `LLAMA_CTX_SIZE=2048`
+- `LLAMA_BATCH_SIZE=1024`
+- `LLAMA_N_GPU_LAYERS=20` - 일부 레이어만 GPU에
+- 작은 quantization (Q4_K_M 또는 Q4_0)
+
+**🖥️ CPU 전용 환경:**
+- `LLAMA_N_GPU_LAYERS=0` - GPU 비활성화
+- `LLM_THREADS=8` - CPU 스레드 증가
+- `LLAMA_CTX_SIZE=1024` - 메모리 절약
+
+### config.py 직접 수정
+
+`src/common/config.py`에서 기본값 변경 가능
 
 ## 🎯 출력 형식
 
@@ -241,19 +333,72 @@ Scene 1
 ## 🔧 트러블슈팅
 
 ### llama-server not found
+
+**Windows:**
+```powershell
+# llama.cpp를 CUDA로 빌드
+cd llama.cpp
+cmake -B build -DLLAMA_CUDA=ON
+cmake --build build --config Release
+
+# 또는 scripts/llama_server_manager.ps1에서 경로 지정
+```
+
+**Linux:**
 ```bash
 # llama.cpp를 빌드
 cd llama.cpp
-cmake -B build
+cmake -B build -DLLAMA_CUDA=ON  # GPU 지원
 cmake --build build --config Release
 
 # llama-server가 PATH에 있는지 확인
 which llama-server
+```
 
-# 또는 scripts/llama_server_manager.sh에서 경로 지정
+### CUDA 오류 (GPU 인식 안됨)
+
+```bash
+# CUDA Toolkit 설치 확인
+nvcc --version
+
+# GPU 인식 확인
+nvidia-smi
+
+# PyTorch GPU 테스트
+python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+```
+
+llama.cpp는 CUDA를 직접 사용하므로 PyTorch 설치는 선택사항입니다.
+
+### Out of VRAM
+
+GPU 메모리 부족 시:
+```bash
+# 환경 변수로 GPU 레이어 수 줄이기
+export LLAMA_N_GPU_LAYERS=20  # 모두(-1) 대신 일부만
+
+# 또는 더 작은 quantization 모델 사용
+# Q6_K → Q4_K_M → Q4_0 순으로 VRAM 사용량 감소
 ```
 
 ### llama-server 관리
+
+**Windows:**
+```powershell
+# 서버 시작
+.\scripts\llama_server_manager.ps1 start
+
+# 서버 상태 확인
+.\scripts\llama_server_manager.ps1 status
+
+# 서버 중지
+.\scripts\llama_server_manager.ps1 stop
+
+# 서버 재시작
+.\scripts\llama_server_manager.ps1 restart
+```
+
+**Linux:**
 ```bash
 # 서버 시작
 ./scripts/llama_server_manager.sh start
@@ -287,10 +432,20 @@ ls models/llama-3.1-8b/
 - 동시 요청 수 제한
 
 ### 생성 속도가 느림
-- llama-server 사용 권장 (llama-cli보다 10-50배 빠름)
-- GPU 사용 가능시 CUDA/Metal 활성화
-- 더 작은 모델 사용 (8B 대신 3B)
-- BATCH_SIZE 조정
+- **✅ GPU 활성화 필수!** llama.cpp를 CUDA로 빌드
+- `LLAMA_N_GPU_LAYERS=-1` 설정 확인 (모든 레이어를 GPU에)
+- llama-server 로그 확인: GPU가 실제로 사용되는지 체크
+- 더 작은 모델 사용 (8B 대신 7B 또는 3B)
+- Flash Attention 활성화 (`--flash-attn` 옵션)
+
+**GPU 사용 확인:**
+```bash
+# Windows
+nvidia-smi  # GPU 사용률 확인
+
+# llama-server 로그 확인
+Get-Content output/logs/llama_server.log -Tail 50
+```
 
 ## 🆕 새로운 기능 (v2.0)
 
