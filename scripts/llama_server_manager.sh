@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# llama-server 관리 스크립트 (CPU-only 최적화 버전)
+# llama-server 관리 스크립트 (GPU 지원)
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -14,14 +14,21 @@ mkdir -p "$(dirname "$LOG_FILE")"
 SERVER_HOST="127.0.0.1"
 SERVER_PORT=8080
 
-# CPU-only 환경에서 가능한 옵션 ONLY
+# GPU 지원 llama-server 파라미터
+# -ngl -1 = 모든 레이어를 GPU에 로드 (CUDA 사용)
+# GPU가 없으면 자동으로 CPU 사용
 LLAMA_PARAMS=(
     --host "$SERVER_HOST"
     --port "$SERVER_PORT"
     --model "$MODEL_PATH"
-    --threads 8
-    --ctx-size 1024
-    --mlock
+    --ctx-size 4096              # GPU: 더 큰 컨텍스트
+    --batch-size 2048            # GPU: 큰 배치 크기
+    --threads 4                  # GPU 환경: CPU 스레드 적게
+    --n-gpu-layers -1            # 모든 레이어를 GPU에 로드 (-1)
+    --parallel 8                 # 동시 요청 처리
+    --cont-batching              # Continuous batching 활성화
+    --flash-attn                 # Flash Attention 활성화 (속도 향상)
+    --mlock                      # 메모리 고정
     --log-disable
 )
 
@@ -54,12 +61,13 @@ start_server() {
     fi
 
     echo "=========================================="
-    echo " llama-server 시작 (CPU-only)"
+    echo " llama-server 시작 (GPU 가속)"
     echo "=========================================="
     echo "모델: ${MODEL_PATH##*/}"
     echo "포트: $SERVER_PORT"
-    echo "Threads: 8"
-    echo "Context: 1024 tokens"
+    echo "GPU 레이어: 모두 (-1)"
+    echo "Context: 4096 tokens"
+    echo "Batch: 2048"
     echo "=========================================="
 
     nohup "$LLAMA_SERVER" "${LLAMA_PARAMS[@]}" > "$LOG_FILE" 2>&1 &
