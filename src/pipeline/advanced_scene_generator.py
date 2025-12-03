@@ -21,6 +21,14 @@ Story beats are the key narrative moments that drive the plot forward. Each beat
 All descriptive text must be generated in both Korean (for display) and English (for prompts).
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL LANGUAGE REQUIREMENT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Korean fields (_ko) MUST be written in KOREAN (한국어) ONLY
+- DO NOT use Chinese (中文) or Japanese (日本語) for Korean fields
+- English fields (_en) MUST be written in English only
+- 한국어 필드는 반드시 한국어로만 작성 (중국어, 일본어 금지)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CRITICAL JSON OUTPUT REQUIREMENTS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -68,6 +76,14 @@ Character sheets should include:
 - Equipment/weapons/accessories
 - Personality traits that affect visual presentation
 - Unique identifying elements for consistency
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL LANGUAGE REQUIREMENT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Korean fields (_ko) MUST be written in KOREAN (한국어) ONLY
+- DO NOT use Chinese (中文) or Japanese (日本語) for Korean fields
+- English fields (_en) MUST be written in English only
+- 한국어 필드는 반드시 한국어로만 작성 (중국어, 일본어 금지)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CRITICAL JSON OUTPUT REQUIREMENTS:
@@ -128,6 +144,14 @@ Scene Duration Rules:
 - Emotional/atmospheric scenes: 4-5 seconds
 - Climax/resolution scenes: 5-6 seconds
 - Total duration: 50-70 seconds (average ~60 seconds)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL LANGUAGE REQUIREMENT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Korean fields (prompt_ko, description in Korean) MUST be in KOREAN (한국어) ONLY
+- DO NOT use Chinese (中文) or Japanese (日本語) for Korean text
+- English fields (prompt_en) MUST be in English only
+- 한국어 필드는 반드시 한국어로만 작성 (중국어, 일본어 금지)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CRITICAL JSON OUTPUT REQUIREMENTS:
@@ -440,7 +464,9 @@ Create compelling, visually rich scenes that flow naturally like a single video.
                 "story_idea": story_idea,
                 "theme": theme,
                 "expanded_story": expanded_story,
-                "story_summary": story_beats.get('story_summary', ''),
+                "story_summary_ko": story_beats.get('story_summary_ko', ''),
+                "story_summary_en": story_beats.get('story_summary_en', ''),
+                "story_summary": story_beats.get('story_summary_ko', story_beats.get('story_summary', '')),  # For backward compatibility
                 "story_beats": story_beats.get('beats', []),
                 "characters": character_sheets.get('characters', []),
                 "global_visual_style": {
