@@ -18,7 +18,7 @@ $MODEL_PATH = Join-Path $PROJECT_DIR "models\solar-10.7b\solar-10.7b-instruct-v1
 $LLAMA_SERVER = Join-Path $PROJECT_DIR "engine\llama.cpp\build\bin\Release\llama-server.exe"
 
 # 로그 디렉토리 생성
-$LOG_DIR = Split-Path -Parent $LOG_FILE
+$LOG_DIR = Split-Path -Parent $OUT_LOG_FILE
 if (-not (Test-Path $LOG_DIR)) {
     New-Item -ItemType Directory -Path $LOG_DIR -Force | Out-Null
 }
@@ -122,7 +122,8 @@ function Start-LlamaServer {
 
     Write-Host ""
     Write-Host "[오류] 60초 동안 서버 응답 없음" -ForegroundColor Red
-    Write-Host "[로그 확인] Get-Content $LOG_FILE -Tail 20" -ForegroundColor Yellow
+    Write-Host "[stdout 로그 확인] Get-Content $OUT_LOG_FILE -Tail 20" -ForegroundColor Yellow
+    Write-Host "[stderr 로그 확인] Get-Content $ERR_LOG_FILE -Tail 20" -ForegroundColor Yellow
     Stop-LlamaServer
     exit 1
 }

@@ -18,13 +18,10 @@
             <button class="tab-btn active" data-tab="cinematic-story">
                 <span class="tab-indicator">●</span> 시네마틱 / 스토리 모드
             </button>
-            <button class="tab-btn" data-tab="auto-short">
-                <span class="tab-indicator">○</span> 🚀 Auto Short Generator
-            </button>
             <button class="tab-btn" data-tab="trend-meme">
                 <span class="tab-indicator">○</span> 트렌드 · 밈 메타 모드
             </button>
-            <div class="tab-hint">숫자 1/2/3 또는 탭 버튼을 눌러 전환하세요</div>
+            <div class="tab-hint">숫자 1/2 또는 탭 버튼을 눌러 전환하세요</div>
         </nav>
 
         <hr>
@@ -351,114 +348,6 @@
                 <button id="save-and-finish-btn" class="btn btn-primary">💾 저장 및 완료</button>
                 <button id="start-new-btn" class="btn btn-secondary">🆕 새 프로젝트 시작</button>
             </div>
-            </section>
-        </div>
-
-        <!-- AI Short Auto-Generation Tab -->
-        <div id="tab-content-auto-short" class="tab-content hidden">
-            <section id="auto-short-panel" class="step-section">
-                <h2>🎬 AI Short Auto-Generation</h2>
-                <p class="section-description">One-click automatic pipeline: Story → Images → Video</p>
-
-                <div class="info-message">
-                    <strong>How it works:</strong>
-                    <ol style="margin: 10px 0; padding-left: 20px;">
-                        <li>Story & scene generation (llama-server)</li>
-                        <li>Vertical image generation per scene (ComfyUI + SDXL)</li>
-                        <li>Video clip generation per scene (WAN2.2 I2V)</li>
-                        <li>Final video assembly (ffmpeg concat)</li>
-                    </ol>
-                </div>
-
-                <!-- Health Check -->
-                <div class="form-group">
-                    <button id="check-health-btn" class="btn btn-secondary">🔍 Check Engines Status</button>
-                    <div id="health-status" class="info-box hidden" style="margin-top: 10px;"></div>
-                </div>
-
-                <hr>
-
-                <!-- Input Form -->
-                <div class="form-group">
-                    <label>Theme (Required) *</label>
-                    <input type="text" id="auto-theme-input" class="form-input"
-                           placeholder="e.g., 'space adventure', 'underwater mystery', 'cyberpunk city'">
-                </div>
-
-                <div class="options-grid">
-                    <div class="form-group">
-                        <label>Visual Style</label>
-                        <select id="auto-style-select" class="form-select">
-                            <option value="cinematic">Cinematic</option>
-                            <option value="anime">Anime</option>
-                            <option value="dark_fantasy">Dark Fantasy</option>
-                            <option value="watercolor">Watercolor</option>
-                            <option value="cyber_fantasy">Cyber Fantasy</option>
-                            <option value="horror">Horror</option>
-                            <option value="sci_fi">Sci-Fi</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Scene Count</label>
-                        <select id="auto-scene-count-select" class="form-select">
-                            <option value="3">3 scenes (short)</option>
-                            <option value="4" selected>4 scenes (default)</option>
-                            <option value="5">5 scenes</option>
-                            <option value="6">6 scenes</option>
-                            <option value="8">8 scenes (long)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Title Hint (Optional)</label>
-                    <input type="text" id="auto-title-hint-input" class="form-input"
-                           placeholder="Optional: suggest a title direction">
-                </div>
-
-                <!-- Generate Button -->
-                <div class="button-group">
-                    <button id="generate-auto-short-btn" class="btn btn-primary">🚀 Generate Short (Auto)</button>
-                </div>
-
-                <div id="auto-short-loading" class="loading hidden">Generating short video...</div>
-
-                <!-- Progress Panel -->
-                <div id="auto-short-progress" class="hidden" style="margin-top: 20px;">
-                    <h3>📊 Generation Progress</h3>
-                    <div id="progress-details" class="info-box">
-                        <div><strong>Status:</strong> <span id="progress-status">Pending</span></div>
-                        <div><strong>Progress:</strong> <span id="progress-percent">0</span>%</div>
-                        <div><strong>Current Step:</strong> <span id="progress-step">Waiting...</span></div>
-                    </div>
-                    <div class="progress-bar-container" style="margin-top: 10px;">
-                        <div id="progress-bar-fill" style="width: 0%; height: 20px; background: #4CAF50; transition: width 0.3s;"></div>
-                    </div>
-                </div>
-
-                <!-- Result Panel -->
-                <div id="auto-short-result" class="hidden" style="margin-top: 30px;">
-                    <h3>✅ Short Video Generated!</h3>
-
-                    <div class="story-box">
-                        <h4 id="result-title">Title</h4>
-                        <p id="result-synopsis">Synopsis...</p>
-                    </div>
-
-                    <div id="result-scenes-container" class="character-grid"></div>
-
-                    <div class="story-box" style="margin-top: 20px;">
-                        <h4>🎥 Final Video</h4>
-                        <video id="result-final-video" controls style="width: 100%; max-width: 400px; margin: 10px 0;">
-                            <source id="result-video-source" src="" type="video/mp4">
-                            Your browser does not support the video tag.
-                        </video>
-                        <div>
-                            <a id="result-download-link" href="" download class="btn btn-primary">⬇️ Download Video</a>
-                        </div>
-                    </div>
-                </div>
             </section>
         </div>
 
