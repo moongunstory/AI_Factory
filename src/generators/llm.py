@@ -54,20 +54,20 @@ class LlamaClient:
         self.top_p = top_p
         self.timeout = timeout
 
-        # HTTP 세션 설정 (연결 재사용)
+        # HTTP 세션 설정 (단일 사용자 환경 최적화)
         self.session = requests.Session()
 
-        # Retry 전략: 연결 실패 시 3번까지 재시도
+        # 단일 사용자 환경: 간단한 retry만 (로컬 서버 통신)
         retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,
+            total=1,  # 1회만 재시도 (로컬 서버)
+            backoff_factor=0.5,
             status_forcelist=[500, 502, 503, 504],
             allowed_methods=["POST", "GET"]
         )
         adapter = HTTPAdapter(
             max_retries=retry_strategy,
-            pool_connections=10,
-            pool_maxsize=20
+            pool_connections=1,   # 단일 연결만 필요
+            pool_maxsize=1        # 순차 요청만 처리
         )
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)

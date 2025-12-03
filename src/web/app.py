@@ -64,38 +64,20 @@ def get_components():
 
 
 def cleanup_on_shutdown():
-    """Clean up resources when server shuts down.
-
-    This function:
-    - Clears all active sessions
-    - Logs shutdown information
-    - Performs graceful cleanup
-    """
-    logger.info("Server shutting down - cleaning up resources...")
-
+    """Clean up resources when server shuts down (single-user simplified)."""
+    logger.info("Shutting down...")
     try:
-        # Clear all Flask session data
-        with app.app_context():
-            # Note: Flask sessions are client-side by default,
-            # so we just log the cleanup
-            logger.info("Session data will be cleared on client side")
-
         # Clean up AI components
         global components
         if components is not None:
-            logger.info("Cleaning up AI components...")
-            # LlamaClient sessions will be closed via __del__
             components = None
-
-        logger.info("✓ Cleanup completed successfully")
-
+        logger.info("Cleanup done")
     except Exception as e:
-        logger.error(f"Error during cleanup: {e}")
+        logger.error(f"Cleanup error: {e}")
 
 
 def signal_handler(signum, frame):
-    """Handle shutdown signals (SIGINT, SIGTERM)."""
-    logger.info(f"Received signal {signum} - initiating graceful shutdown...")
+    """Handle shutdown signals (simplified for single-user)."""
     cleanup_on_shutdown()
     sys.exit(0)
 
@@ -695,8 +677,7 @@ def generate_short_api():
 
         logger.info(f"Starting short generation: theme='{theme}', style='{style}', scenes={scene_count}")
 
-        # Run the full pipeline (synchronous for now)
-        # TODO: Move to background job/queue for async processing
+        # Run the full pipeline (synchronous - single-user environment)
         result = generate_short(
             theme=theme,
             style=style,
@@ -776,11 +757,11 @@ def get_short_status(short_id):
 
 
 if __name__ == '__main__':
-    # Development server with threading enabled for better concurrency
+    # Single-user local environment: sequential processing
     app.run(
         host='127.0.0.1',
         port=5000,
         debug=True,
-        threaded=True,  # 동시 요청 처리 가능
+        threaded=False,  # 단일 사용자: 순차 처리로 충분
         use_reloader=False  # llama-server와의 충돌 방지
     )
