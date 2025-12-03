@@ -35,7 +35,6 @@ const AppState = {
 // 탭 ID 정의 (상단 탭 UI용)
 const Tabs = {
     CINEMATIC_STORY: 'cinematic-story',
-    AUTO_SHORT: 'auto-short',
     TREND_MEME_META: 'trend-meme'
 };
 
@@ -104,13 +103,11 @@ function initTabs() {
         });
     });
 
-    // 키보드 단축키: 1/2/3로 탭 전환
+    // 키보드 단축키: 1/2로 탭 전환
     document.addEventListener('keydown', (event) => {
         if (event.key === '1') {
             switchTab(Tabs.CINEMATIC_STORY);
         } else if (event.key === '2') {
-            switchTab(Tabs.AUTO_SHORT);
-        } else if (event.key === '3') {
             switchTab(Tabs.TREND_MEME_META);
         }
     });
@@ -127,7 +124,6 @@ function switchTab(tabId) {
 
 function renderTabContent() {
     const cinematicContent = document.getElementById('tab-content-cinematic');
-    const autoShortContent = document.getElementById('tab-content-auto-short');
     const trendContent = document.getElementById('tab-content-trend');
     const progressBar = document.getElementById('progress-bar');
 
@@ -142,18 +138,11 @@ function renderTabContent() {
 
     if (AppState.activeTab === Tabs.CINEMATIC_STORY) {
         cinematicContent?.classList.remove('hidden');
-        autoShortContent?.classList.add('hidden');
         trendContent?.classList.add('hidden');
         showSection('step-0-mode-selection');
         updateProgressBar(AppState.currentStep || 0);
-    } else if (AppState.activeTab === Tabs.AUTO_SHORT) {
-        cinematicContent?.classList.add('hidden');
-        autoShortContent?.classList.remove('hidden');
-        trendContent?.classList.add('hidden');
-        progressBar?.classList.add('hidden');
     } else {
         cinematicContent?.classList.add('hidden');
-        autoShortContent?.classList.add('hidden');
         trendContent?.classList.remove('hidden');
         progressBar?.classList.add('hidden');
 
@@ -729,142 +718,6 @@ function initPromptsDisplay() {
 }
 
 // ============================================================================
-// Auto Short Generator Mode
-// ============================================================================
-
-function initAutoShortGenerator() {
-    // Health check button
-    const checkHealthBtn = document.getElementById('check-health-btn');
-    if (checkHealthBtn) {
-        checkHealthBtn.addEventListener('click', async () => {
-            await checkEngineHealth();
-        });
-    }
-
-    // Generate button
-    const generateBtn = document.getElementById('generate-auto-short-btn');
-    if (generateBtn) {
-        generateBtn.addEventListener('click', async () => {
-            await generateAutoShort();
-        });
-    }
-}
-
-async function checkEngineHealth() {
-    const statusBox = document.getElementById('health-status');
-    statusBox.classList.remove('hidden');
-    statusBox.innerHTML = '<div>Checking engine health...</div>';
-
-    try {
-        const result = await apiCall('/api/health', 'GET');
-
-        const engines = result.engines;
-        const statusHtml = `
-            <div><strong>Overall Status:</strong> ${result.ok ? '✅ Ready' : '❌ Not Ready'}</div>
-            <div style="margin-top: 10px;">
-                <div>llama-server: ${engines.llama_server ? '✅ Running' : '❌ Not Running'}</div>
-                <div>ComfyUI: ${engines.comfyui ? '✅ Running' : '❌ Not Running'}</div>
-                <div>WAN2.2: ${engines.wan22 ? '✅ Available' : '⚠️ Not Available (will use fallback)'}</div>
-            </div>
-        `;
-        statusBox.innerHTML = statusHtml;
-
-    } catch (error) {
-        statusBox.innerHTML = `<div style="color: red;">❌ Health check failed: ${error.message}</div>`;
-    }
-}
-
-async function generateAutoShort() {
-    const theme = document.getElementById('auto-theme-input').value.trim();
-    const style = document.getElementById('auto-style-select').value;
-    const sceneCount = parseInt(document.getElementById('auto-scene-count-select').value);
-    const titleHint = document.getElementById('auto-title-hint-input').value.trim();
-
-    if (!theme) {
-        alert('Please enter a theme');
-        return;
-    }
-
-    // Hide result, show progress
-    document.getElementById('auto-short-result').classList.add('hidden');
-    document.getElementById('auto-short-progress').classList.remove('hidden');
-    document.getElementById('auto-short-loading').classList.remove('hidden');
-
-    // Reset progress
-    updateAutoShortProgress('pending', 0, 'Starting...');
-
-    try {
-        const result = await apiCall('/api/shorts/generate', 'POST', {
-            theme,
-            style,
-            scene_count: sceneCount,
-            title_hint: titleHint || null
-        });
-
-        // Generation complete
-        document.getElementById('auto-short-loading').classList.add('hidden');
-        updateAutoShortProgress('done', 100, 'Complete!');
-
-        // Display result
-        displayAutoShortResult(result);
-
-    } catch (error) {
-        document.getElementById('auto-short-loading').classList.add('hidden');
-        updateAutoShortProgress('error', 0, `Error: ${error.message}`);
-        alert(`Generation failed: ${error.message}`);
-    }
-}
-
-function updateAutoShortProgress(status, progress, step) {
-    document.getElementById('progress-status').textContent = status;
-    document.getElementById('progress-percent').textContent = progress;
-    document.getElementById('progress-step').textContent = step;
-    document.getElementById('progress-bar-fill').style.width = `${progress}%`;
-}
-
-function displayAutoShortResult(result) {
-    document.getElementById('auto-short-result').classList.remove('hidden');
-
-    // Title and synopsis
-    document.getElementById('result-title').textContent = result.title;
-    document.getElementById('result-synopsis').textContent = result.synopsis;
-
-    // Scenes
-    const scenesContainer = document.getElementById('result-scenes-container');
-    scenesContainer.innerHTML = '';
-
-    result.scenes.forEach(scene => {
-        if (scene.image_path) {
-            const sceneCard = document.createElement('div');
-            sceneCard.className = 'character-card';
-            sceneCard.innerHTML = `
-                <div class="character-name">Scene ${scene.id}</div>
-                <div class="character-detail"><strong>${scene.name}</strong></div>
-                <img src="/${scene.image_path}" alt="Scene ${scene.id}" style="width: 100%; margin-top: 10px; border-radius: 4px;">
-                ${scene.video_path ? `<div style="margin-top: 5px;"><a href="/${scene.video_path}" target="_blank">🎥 View clip</a></div>` : ''}
-            `;
-            scenesContainer.appendChild(sceneCard);
-        }
-    });
-
-    // Final video
-    const videoSource = document.getElementById('result-video-source');
-    const videoElement = document.getElementById('result-final-video');
-    const downloadLink = document.getElementById('result-download-link');
-
-    if (result.final_video_path) {
-        const videoUrl = `/${result.final_video_path}`;
-        videoSource.src = videoUrl;
-        videoElement.load();
-        downloadLink.href = videoUrl;
-        downloadLink.download = `${result.title.replace(/\s+/g, '_')}.mp4`;
-    }
-
-    // Scroll to result
-    document.getElementById('auto-short-result').scrollIntoView({ behavior: 'smooth' });
-}
-
-// ============================================================================
 // Initialization
 // ============================================================================
 
@@ -877,7 +730,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initStoryExpanded();
     initPromptsDisplay();
     initTrendMemeMode();
-    initAutoShortGenerator();
 
     // Show initial section
     showSection('step-0-mode-selection');
