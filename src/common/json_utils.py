@@ -24,6 +24,7 @@ def extract_json_block(text: str) -> str:
     - "Here's the result: {...}"
     - "```json\n{...}\n```"
     - Plain JSON: "{...}"
+    - Text with JSON embedded: "Some text {...} more text"
 
     Args:
         text: Text that may contain JSON
@@ -31,28 +32,33 @@ def extract_json_block(text: str) -> str:
     Returns:
         Extracted JSON string
     """
-    # Remove markdown code blocks
+    # Remove markdown code blocks (both ```json and ```)
     text = re.sub(r'```json\s*', '', text)
     text = re.sub(r'```\s*', '', text)
 
     # Remove leading/trailing whitespace
     text = text.strip()
 
-    # Find JSON content (between first { and last })
+    # Strategy 1: Find JSON object (between first { and last })
     start_idx = text.find('{')
     end_idx = text.rfind('}')
 
     if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
-        return text[start_idx:end_idx + 1]
+        extracted = text[start_idx:end_idx + 1]
+        logger.debug(f"Extracted JSON object (length: {len(extracted)})")
+        return extracted
 
-    # Try array format: [...]
+    # Strategy 2: Try array format: [...]
     start_idx = text.find('[')
     end_idx = text.rfind(']')
 
     if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
-        return text[start_idx:end_idx + 1]
+        extracted = text[start_idx:end_idx + 1]
+        logger.debug(f"Extracted JSON array (length: {len(extracted)})")
+        return extracted
 
-    # Return as-is if no JSON markers found
+    # Strategy 3: If no JSON markers found, log warning and return as-is
+    logger.warning(f"No JSON markers found in text. First 200 chars: {text[:200]}")
     return text
 
 
