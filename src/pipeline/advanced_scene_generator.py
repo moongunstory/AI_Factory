@@ -36,16 +36,21 @@ All descriptive text must be generated in both Korean (for display) and English 
 한국어 필드(_ko)에는 순수 한글만 사용하세요!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITICAL JSON OUTPUT REQUIREMENTS:
+🚨🚨🚨 CRITICAL JSON OUTPUT REQUIREMENTS 🚨🚨🚨
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. OUTPUT ONLY PURE JSON - NO OTHER TEXT
-2. NO explanations, NO comments, NO markdown
-3. NO text before or after the JSON object
-4. START with { and END with }
-5. MUST be valid, parseable JSON
+⚠️ YOU MUST OUTPUT VALID JSON ONLY - NOTHING ELSE ⚠️
 
-Required JSON Schema:
+❌ DO NOT output like this (WRONG FORMAT):
+   1. (beat_number: 1, description_ko: "...", ...)
+   2. (beat_number: 2, description_ko: "...", ...)
+
+❌ DO NOT output explanations or text before/after JSON
+❌ DO NOT use markdown code blocks like ```json
+❌ DO NOT number the items outside the JSON structure
+
+✅ CORRECT FORMAT - Start your response with { and end with }:
+
 {
   "story_summary_ko": "전체 서사에 대한 한 문단 요약",
   "story_summary_en": "One paragraph summary of the full narrative",
@@ -54,11 +59,26 @@ Required JSON Schema:
       "beat_number": 1,
       "description_ko": "전사는 어둠 속에서 여정을 준비합니다",
       "description_en": "The warrior prepares for the journey in darkness",
-      "narrative_function": "setup/rising_action/climax/resolution"
+      "narrative_function": "setup"
+    },
+    {
+      "beat_number": 2,
+      "description_ko": "전사는 위험한 숲을 통과합니다",
+      "description_en": "The warrior crosses through the dangerous forest",
+      "narrative_function": "rising_action"
     }
   ],
   "total_beats": 12
 }
+
+CRITICAL RULES:
+1. Your ENTIRE response must be ONLY this JSON object
+2. START with { (opening brace)
+3. END with } (closing brace)
+4. NO text before the {
+5. NO text after the }
+6. MUST be valid, parseable JSON
+7. Use proper JSON syntax: double quotes, commas, no trailing commas
 
 Guidelines:
 - Create 10-15 story beats
@@ -68,7 +88,7 @@ Guidelines:
 - Beats should flow naturally and build tension
 - Descriptions should be concise but clear
 
-REMEMBER: Output ONLY the JSON object. Nothing else."""
+🚨 REMEMBER: Your response must START with { and END with } - NOTHING ELSE! 🚨"""
 
     # System prompt for character sheet generation
     CHARACTER_SHEET_SYSTEM_PROMPT = """You are an expert character designer for visual media.
@@ -100,16 +120,17 @@ Character sheets should include:
 한국어 필드(_ko)에는 순수 한글만 사용하세요!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITICAL JSON OUTPUT REQUIREMENTS:
+🚨🚨🚨 CRITICAL JSON OUTPUT REQUIREMENTS 🚨🚨🚨
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. OUTPUT ONLY PURE JSON - NO OTHER TEXT
-2. NO explanations, NO comments, NO markdown
-3. NO text before or after the JSON object
-4. START with { and END with }
-5. MUST be valid, parseable JSON
+⚠️ YOU MUST OUTPUT VALID JSON ONLY - NOTHING ELSE ⚠️
 
-Required JSON Schema:
+❌ DO NOT output explanations or descriptions
+❌ DO NOT use markdown code blocks like ```json
+❌ DO NOT add any text before or after the JSON
+
+✅ CORRECT FORMAT - Start your response with { and end with }:
+
 {
   "characters": [
     {
@@ -129,6 +150,15 @@ Required JSON Schema:
   ]
 }
 
+CRITICAL RULES:
+1. Your ENTIRE response must be ONLY this JSON object
+2. START with { (opening brace)
+3. END with } (closing brace)
+4. NO text before the {
+5. NO text after the }
+6. MUST be valid, parseable JSON
+7. Use proper JSON syntax: double quotes, commas, no trailing commas
+
 Guidelines:
 - Identify 2-4 main characters from the story
 - Be VERY specific and detailed
@@ -137,7 +167,7 @@ Guidelines:
 - Focus on visually distinctive features
 - Add consistency tags for Stable Diffusion
 
-REMEMBER: Output ONLY the JSON object. Nothing else."""
+🚨 REMEMBER: Your response must START with { and END with } - NOTHING ELSE! 🚨"""
 
     # System prompt for scene generation
     SCENE_GENERATION_SYSTEM_PROMPT = """You are an expert cinematic director and Stable Diffusion prompt engineer.
@@ -175,16 +205,17 @@ Scene Duration Rules:
 한국어 필드(prompt_ko)에는 순수 한글만 사용하세요!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITICAL JSON OUTPUT REQUIREMENTS:
+🚨🚨🚨 CRITICAL JSON OUTPUT REQUIREMENTS 🚨🚨🚨
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. OUTPUT ONLY PURE JSON - NO OTHER TEXT
-2. NO explanations, NO comments, NO markdown
-3. NO text before or after the JSON object
-4. START with { and END with }
-5. MUST be valid, parseable JSON
+⚠️ YOU MUST OUTPUT VALID JSON ONLY - NOTHING ELSE ⚠️
 
-Required JSON Schema:
+❌ DO NOT output explanations or text before/after JSON
+❌ DO NOT use markdown code blocks like ```json
+❌ DO NOT number scenes outside the JSON structure
+
+✅ CORRECT FORMAT - Start your response with { and end with }:
+
 {
   "scenes": [
     {
@@ -193,11 +224,27 @@ Required JSON Schema:
       "description": "The warrior stands at the edge of the dark forest, gripping his sword",
       "prompt_en": "detailed high-quality prompt following 7-part structure",
       "prompt_ko": "한국어 번역"
+    },
+    {
+      "scene_number": 2,
+      "duration": 4.0,
+      "description": "The warrior enters the dark forest",
+      "prompt_en": "another detailed prompt",
+      "prompt_ko": "또 다른 한국어 번역"
     }
   ],
   "total_scenes": 23,
   "total_duration": 62.5
 }
+
+CRITICAL RULES:
+1. Your ENTIRE response must be ONLY this JSON object
+2. START with { (opening brace)
+3. END with } (closing brace)
+4. NO text before the {
+5. NO text after the }
+6. MUST be valid, parseable JSON
+7. Use proper JSON syntax: double quotes, commas, no trailing commas
 
 Critical Rules:
 - MUST generate exactly 20-25 scenes
@@ -208,7 +255,7 @@ Critical Rules:
 - Never use generic or vague descriptions
 - Every scene must be distinct and cinematic
 
-REMEMBER: Output ONLY the JSON object. Nothing else."""
+🚨 REMEMBER: Your response must START with { and END with } - NOTHING ELSE! 🚨"""
 
     def __init__(self, llm_client: Optional[LlamaClient] = None):
         """Initialize the advanced scene generator.
