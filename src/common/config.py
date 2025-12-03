@@ -31,17 +31,17 @@ class Config:
     LLAMA_SERVER_PORT = int(os.getenv("LLAMA_SERVER_PORT", "8080"))
     LLAMA_SERVER_URL = f"http://{LLAMA_SERVER_HOST}:{LLAMA_SERVER_PORT}"
 
-    # llama-server 최적화 파라미터 (GPU 지원)
-    LLAMA_CTX_SIZE = int(os.getenv("LLAMA_CTX_SIZE", "4096"))  # GPU 환경: 더 큰 컨텍스트 가능
-    LLAMA_BATCH_SIZE = int(os.getenv("LLAMA_BATCH_SIZE", "2048"))  # GPU 환경: 큰 배치 크기
-    LLAMA_N_PARALLEL = int(os.getenv("LLAMA_N_PARALLEL", "1"))  # GPU: 더 많은 동시 요청 처리
+    # llama-server 최적화 파라미터 (단일 사용자 로컬 환경)
+    LLAMA_CTX_SIZE = int(os.getenv("LLAMA_CTX_SIZE", "4096"))  # 단일 요청 전체 컨텍스트
+    LLAMA_BATCH_SIZE = int(os.getenv("LLAMA_BATCH_SIZE", "512"))  # 단일 요청 최적화 (메모리 효율)
+    LLAMA_N_PARALLEL = 1  # 단일 슬롯 강제 (환경변수 무시)
     LLAMA_N_GPU_LAYERS = int(os.getenv("LLAMA_N_GPU_LAYERS", "-1"))  # -1 = 모든 레이어를 GPU에 로드
 
     # LLM parameters (클라이언트 요청 시 사용)
     LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.7"))
-    LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "2048"))  # GPU: 더 긴 출력 가능
+    LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "2048"))  # 단일 요청 최대 토큰
     LLM_TOP_P = float(os.getenv("LLM_TOP_P", "0.9"))
-    LLM_THREADS = int(os.getenv("LLM_THREADS", "4"))  # GPU 환경: CPU 스레드는 적게 사용
+    LLM_THREADS = int(os.getenv("LLM_THREADS", "4"))  # CPU 보조 스레드 (GPU 메인)
 
     # HTTP 요청 타임아웃 (초)
     LLM_REQUEST_TIMEOUT = int(os.getenv("LLM_REQUEST_TIMEOUT", "120"))  # 2분

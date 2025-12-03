@@ -83,20 +83,20 @@ class ServerManager:
             logger.error(f"llama-server executable not found: {self.llama_server_exe}")
             raise FileNotFoundError(f"llama-server executable not found: {self.llama_server_exe}")
 
-        # Parameters from the original .ps1 script
+        # Parameters optimized for single-user local environment
         params = [
             str(self.llama_server_exe),
             "--host", self.server_host,
             "--port", str(self.server_port),
             "--model", str(self.model_path),
-            "--ctx-size", "4096",
-            "--batch-size", "2048",
-            "--ubatch-size", "2048", # Controls per-slot context size
+            "--ctx-size", "4096",       # Full context for single request
+            "--batch-size", "512",      # Optimized for single request (reduced from 2048)
+            # --ubatch-size removed: use default (512), no per-slot concept needed
             "--threads", "4",
-            "--n-gpu-layers", "-1",  # Load all layers to GPU
-            "--parallel", "1", # User requested to set this to 1
-            "--cont-batching",
-            "--flash-attn", "on",
+            "--n-gpu-layers", "-1",     # Load all layers to GPU
+            "--parallel", "1",          # Single slot enforced
+            # --cont-batching removed: no multi-request dynamic batching needed
+            "--flash-attn",
             "--verbose"
         ]
 

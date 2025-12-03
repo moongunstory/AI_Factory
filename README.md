@@ -1,6 +1,6 @@
 # 🎬 AI Short Factory
 
-**Windows 11 GPU 최적화 버전** - 간단한 스토리 아이디어를 20-25개 장면의 고품질 Stable Diffusion 프롬프트 시퀀스로 자동 변환하는 도구
+**단일 사용자 로컬 환경 최적화 버전 (Windows 11 GPU)** - 간단한 스토리 아이디어를 20-25개 장면의 고품질 Stable Diffusion 프롬프트 시퀀스로 자동 변환하는 도구
 
 ## 📖 개요
 
@@ -219,11 +219,11 @@ python -m src --list-themes
 `.env` 파일을 생성하거나 환경 변수로 설정:
 
 ```bash
-# GPU 설정 (기본값)
-LLAMA_CTX_SIZE=4096              # 컨텍스트 크기
-LLAMA_BATCH_SIZE=2048            # 배치 크기
+# GPU 설정 (단일 사용자 로컬 환경 최적화)
+LLAMA_CTX_SIZE=4096              # 단일 요청 전체 컨텍스트
+LLAMA_BATCH_SIZE=512             # 단일 요청 최적화 (메모리 효율)
 LLAMA_N_GPU_LAYERS=-1            # GPU 레이어 수 (-1 = 모두)
-LLAMA_N_PARALLEL=1               # 동시 요청 수
+LLAMA_N_PARALLEL=1               # 단일 슬롯만 사용 (강제)
 
 # LLM 파라미터
 LLM_TEMPERATURE=0.7              # 창의성 (0.0-1.0)
@@ -237,18 +237,20 @@ LLAMA_SERVER_PORT=8080
 
 ### GPU 최적화 (Windows 11)
 
-**🚀 현재 설정 (12GB+ VRAM):**
-- `LLAMA_CTX_SIZE=4096` - 충분한 컨텍스트
-- `LLAMA_BATCH_SIZE=2048` - 최적 배치 크기
+**🚀 단일 사용자 로컬 환경 설정 (12GB+ VRAM):**
+- `LLAMA_CTX_SIZE=4096` - 단일 요청 전체 컨텍스트
+- `LLAMA_BATCH_SIZE=512` - 단일 요청 최적화 (메모리 효율)
 - `LLAMA_N_GPU_LAYERS=-1` - 모든 레이어 GPU에
-- `LLAMA_N_PARALLEL=1` - 동시 요청 1개
+- `LLAMA_N_PARALLEL=1` - 단일 슬롯만 사용
+- `--cont-batching` 비활성화 - 멀티 요청 배칭 불필요
 - Flash Attention 활성화
 
 **⚡ VRAM 부족 시 (8GB 이하):**
 - `LLAMA_CTX_SIZE=2048`
-- `LLAMA_BATCH_SIZE=1024`
+- `LLAMA_BATCH_SIZE=256`
 - `LLAMA_N_GPU_LAYERS=20` - 일부 레이어만
 - Q4_K_M 모델 사용
+- cont-batching 비활성화 유지
 
 ### config.py 직접 수정
 

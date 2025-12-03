@@ -23,8 +23,8 @@ from src.common.config import Config
 logger = setup_logger(__name__)
 
 
-# Global state for tracking pipeline progress
-_pipeline_states: Dict[str, Dict[str, Any]] = {}
+# Global state for tracking pipeline progress (single-user: only one pipeline at a time)
+_current_pipeline_state: Optional[Dict[str, Any]] = None
 
 
 class PipelineStatus:
@@ -90,7 +90,8 @@ def generate_short(
     logger.info(f"  Scene count: {scene_count}")
     logger.info("=" * 80)
 
-    # Initialize pipeline state
+    # Initialize pipeline state (single-user: replace any existing pipeline)
+    global _current_pipeline_state
     state = {
         "short_id": short_id,
         "status": PipelineStatus.PENDING,
@@ -102,7 +103,7 @@ def generate_short(
         "scenes": [],
         "final_video_path": None,
     }
-    _pipeline_states[short_id] = state
+    _current_pipeline_state = state
 
     def update_state(status: str, progress: int, current_step: str):
         """Update pipeline state and call progress callback."""
@@ -378,7 +379,7 @@ def concat_vertical_scenes(
 
 
 def get_pipeline_status(short_id: str) -> Optional[Dict[str, Any]]:
-    """Get the current status of a pipeline.
+    """Get the current status of a pipeline (single-user simplified).
 
     Args:
         short_id: Short ID
@@ -386,7 +387,10 @@ def get_pipeline_status(short_id: str) -> Optional[Dict[str, Any]]:
     Returns:
         Status dictionary or None if not found
     """
-    return _pipeline_states.get(short_id)
+    global _current_pipeline_state
+    if _current_pipeline_state and _current_pipeline_state.get("short_id") == short_id:
+        return _current_pipeline_state
+    return None
 
 
 def check_engines_health() -> Dict[str, bool]:
