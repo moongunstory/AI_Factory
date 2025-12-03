@@ -11,8 +11,9 @@ $ErrorActionPreference = "Stop"
 
 # 프로젝트 경로 설정
 $PROJECT_DIR = $PSScriptRoot
-$PID_FILE = Join-Path $PROJECT_DIR "output\logs\.llama_server.pid"
-$LOG_FILE = Join-Path $PROJECT_DIR "output\logs\llama_server.log"
+$PID_FILE     = Join-Path $PROJECT_DIR "output\logs\.llama_server.pid"
+$OUT_LOG_FILE = Join-Path $PROJECT_DIR "output\logs\llama_server.out.log"
+$ERR_LOG_FILE = Join-Path $PROJECT_DIR "output\logs\llama_server.err.log"
 $MODEL_PATH = Join-Path $PROJECT_DIR "models\solar-10.7b\solar-10.7b-instruct-v1.0.Q6_K.gguf"
 $LLAMA_SERVER = Join-Path $PROJECT_DIR "engine\llama.cpp\build\bin\Release\llama-server.exe"
 
@@ -87,15 +88,16 @@ function Start-LlamaServer {
     # llama-server 실행
     $process = Start-Process -FilePath $LLAMA_SERVER `
         -ArgumentList $LLAMA_PARAMS `
-        -RedirectStandardOutput $LOG_FILE `
-        -RedirectStandardError $LOG_FILE `
+        -RedirectStandardOutput $OUT_LOG_FILE `
+        -RedirectStandardError $ERR_LOG_FILE `
         -PassThru `
         -WindowStyle Hidden
 
     $process.Id | Out-File $PID_FILE -Encoding UTF8
 
     Write-Host "[시작] PID $($process.Id)" -ForegroundColor Green
-    Write-Host "[로그] $LOG_FILE" -ForegroundColor Gray
+    Write-Host "[stdout 로그] $OUT_LOG_FILE" -ForegroundColor Gray
+    Write-Host "[stderr 로그] $ERR_LOG_FILE" -ForegroundColor Gray
 
     # Health check
     Write-Host "[대기] 서버 준비 중" -NoNewline -ForegroundColor Yellow
