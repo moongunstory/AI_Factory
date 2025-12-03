@@ -1,6 +1,6 @@
 # 🎬 AI Short Factory
 
-간단한 스토리 아이디어를 20-25개 장면의 고품질 Stable Diffusion 프롬프트 시퀀스로 자동 변환하는 도구
+**Windows 11 GPU 최적화 버전** - 간단한 스토리 아이디어를 20-25개 장면의 고품질 Stable Diffusion 프롬프트 시퀀스로 자동 변환하는 도구
 
 ## 📖 개요
 
@@ -40,9 +40,10 @@ AI Short Factory는 간단한 이야기 아이디어를 받아서:
 7. Global Visual Style: 글로벌 스타일 자동 추가
 
 ### 🚀 기술적 특징
-- 🤖 **로컬 LLM 사용**: llama-server 기반 HTTP API (10-50배 빠른 성능)
+- 🎮 **Windows GPU 가속**: CUDA 기반 최적화 (10-50배 빠른 성능)
+- 🤖 **로컬 LLM 사용**: llama-server 기반 HTTP API
 - 🔧 **JSON 신뢰성**: 2단계 방어 시스템 (~100% JSON 파싱 성공률)
-- 🌐 **웹 UI**: Flask + Streamlit 인터페이스
+- 🌐 **웹 UI**: Flask 인터페이스
 - 🔄 **재생성 기능**: 원하는 장면만 선택적으로 재생성 가능
 - 🇰🇷 **한국어 지원**: 전체 프로세스 한국어 지원
 
@@ -50,11 +51,11 @@ AI Short Factory는 간단한 이야기 아이디어를 받아서:
 
 ```
 AI_Short_Factory/
-├── run.sh                                    # 실행 스크립트
+├── run.bat                                   # Windows 실행 런처
+├── llama_server_manager.ps1                  # llama-server 관리 스크립트 (GPU)
 ├── requirements.txt                          # Python 의존성
 ├── src/
 │   ├── __main__.py                          # CLI 진입점
-│   ├── app.py                               # Streamlit 웹 UI
 │   ├── pipeline/
 │   │   ├── story_expander.py                # 이야기 확장 모듈
 │   │   ├── prompt_generator.py              # 기본 프롬프트 생성 모듈
@@ -73,9 +74,8 @@ AI_Short_Factory/
 │   └── web/
 │       ├── app.py                          # Flask 웹 서버
 │       └── templates/                      # HTML 템플릿
-├── scripts/
-│   └── llama_server_manager.sh             # llama-server 관리 스크립트
-├── models/                                  # GGUF 모델 파일 위치
+├── models/
+│   └── solar-10.7b/                        # SOLAR 10.7B 모델 (Q6_K)
 └── output/                                  # 생성된 결과물 저장
     ├── prompts/                            # 장면 프롬프트 JSON/텍스트
     └── logs/                               # 로그 파일
@@ -85,9 +85,13 @@ AI_Short_Factory/
 
 ### 1. 필요한 것
 
-- Python 3.11+
-- llama.cpp (llama-server 실행 파일)
-- GGUF 형식의 LLM 모델 (권장: Llama 3.1 8B Q4_K_M)
+- **Windows 11** (CUDA 지원)
+- **NVIDIA GPU** (12GB+ VRAM 권장)
+- **CUDA Toolkit 12.x**
+- **Visual Studio 2022** (C++ 빌드 도구)
+- **Python 3.11+**
+- **llama.cpp** (CUDA 빌드)
+- **GGUF 모델** (SOLAR 10.7B Q6_K 사용 중)
 
 ### 2. 설치
 
@@ -96,88 +100,66 @@ AI_Short_Factory/
 pip install -r requirements.txt
 ```
 
-#### llama.cpp 빌드
+#### llama.cpp 빌드 (CUDA)
 
-**🎮 GPU 지원 (권장 - Windows/Linux)**
+**Windows 11에서 CUDA 빌드:**
 
-GPU가 있다면 CUDA를 활성화하여 빌드하세요. **10-50배 빠릅니다!**
-
-**Windows (CUDA):**
 ```powershell
-# Visual Studio 2022 및 CUDA Toolkit 12.x 필요
-git clone https://github.com/ggerganov/llama.cpp
-cd llama.cpp
+# 1. CUDA Toolkit 12.x 설치 확인
+nvcc --version
+
+# 2. llama.cpp 클론 및 빌드
+git clone https://github.com/ggerganov/llama.cpp engine/llama.cpp
+cd engine/llama.cpp
+
+# 3. CUDA 활성화하여 빌드
 cmake -B build -DLLAMA_CUDA=ON
 cmake --build build --config Release
 
-# 빌드 완료 후 engine/llama.cpp/build/bin/Release/llama-server.exe 생성됨
+# 빌드 완료 후 build/bin/Release/llama-server.exe 생성됨
+cd ../..
 ```
-
-**Linux (CUDA):**
-```bash
-git clone https://github.com/ggerganov/llama.cpp
-cd llama.cpp
-cmake -B build -DLLAMA_CUDA=ON
-cmake --build build --config Release
-```
-
-**🖥️ CPU 전용 (GPU 없을 때)**
-```bash
-git clone https://github.com/ggerganov/llama.cpp
-cd llama.cpp
-cmake -B build
-cmake --build build --config Release
-```
-
-빌드 후 `engine/llama.cpp/build/bin/` 경로에 `llama-server` 실행 파일이 생성됩니다.
 
 ### 3. 모델 준비
 
-GGUF 형식의 모델을 다운로드하고 `models/` 디렉토리에 배치:
-```bash
-mkdir -p models/llama-3.1-8b
-# 예: Llama 3.1 8B GGUF 모델 다운로드
-# models/llama-3.1-8b/model-q4_K_M.gguf 경로에 배치
-```
-
-### 4. llama-server 실행
-
-프로젝트를 실행하기 전에 llama-server를 먼저 시작해야 합니다.
-
-**Windows:**
+SOLAR 10.7B Q6_K 모델 다운로드:
 ```powershell
-# 서버 시작
-.\scripts\llama_server_manager.ps1 start
+# models 디렉토리 생성
+mkdir models\solar-10.7b
 
-# 상태 확인
-.\scripts\llama_server_manager.ps1 status
-
-# 서버 중지
-.\scripts\llama_server_manager.ps1 stop
+# SOLAR 10.7B Q6_K GGUF 모델 다운로드
+# Hugging Face: https://huggingface.co/upstage/solar-10.7b-instruct-v1.0-GGUF
+# 파일 위치: models\solar-10.7b\solar-10.7b-instruct-v1.0.Q6_K.gguf
 ```
 
-**Linux/Mac:**
-```bash
-# 서버 시작
-./scripts/llama_server_manager.sh start
+### 4. llama-server 관리
+
+llama-server는 run.bat 실행 시 자동으로 시작됩니다. 수동 관리도 가능합니다:
+
+```powershell
+# 서버 시작 (GPU 가속)
+powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action start
 
 # 상태 확인
-./scripts/llama_server_manager.sh status
+powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action status
 
 # 서버 중지
-./scripts/llama_server_manager.sh stop
+powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action stop
+
+# 서버 재시작
+powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action restart
 ```
 
 ### 5. 애플리케이션 실행
 
 #### A. 웹 UI 실행 (권장)
-```bash
-./run.sh
+```cmd
+run.bat
 ```
-브라우저에서 `http://localhost:8501` 로 자동 접속
+브라우저에서 `http://localhost:5000` 로 자동 접속
 
 #### B. CLI 사용
-```bash
+```cmd
 # 기본 사용
 python -m src "용감한 기사가 용과 싸우는 이야기"
 
@@ -253,23 +235,20 @@ LLAMA_SERVER_HOST=127.0.0.1
 LLAMA_SERVER_PORT=8080
 ```
 
-### GPU 최적화 팁
+### GPU 최적화 (Windows 11)
 
-**🚀 VRAM이 충분한 경우 (12GB+):**
-- `LLAMA_CTX_SIZE=8192` - 더 긴 컨텍스트
-- `LLAMA_BATCH_SIZE=4096` - 더 큰 배치
-- 더 큰 모델 사용 (Q6_K 또는 Q8_0)
+**🚀 현재 설정 (12GB+ VRAM):**
+- `LLAMA_CTX_SIZE=4096` - 충분한 컨텍스트
+- `LLAMA_BATCH_SIZE=2048` - 최적 배치 크기
+- `LLAMA_N_GPU_LAYERS=-1` - 모든 레이어 GPU에
+- `LLAMA_N_PARALLEL=8` - 동시 요청 8개
+- Flash Attention 활성화
 
-**⚡ VRAM이 부족한 경우 (6-8GB):**
+**⚡ VRAM 부족 시 (8GB 이하):**
 - `LLAMA_CTX_SIZE=2048`
 - `LLAMA_BATCH_SIZE=1024`
-- `LLAMA_N_GPU_LAYERS=20` - 일부 레이어만 GPU에
-- 작은 quantization (Q4_K_M 또는 Q4_0)
-
-**🖥️ CPU 전용 환경:**
-- `LLAMA_N_GPU_LAYERS=0` - GPU 비활성화
-- `LLM_THREADS=8` - CPU 스레드 증가
-- `LLAMA_CTX_SIZE=1024` - 메모리 절약
+- `LLAMA_N_GPU_LAYERS=20` - 일부 레이어만
+- Q4_K_M 모델 사용
 
 ### config.py 직접 수정
 
@@ -334,90 +313,62 @@ Scene 1
 
 ### llama-server not found
 
-**Windows:**
 ```powershell
-# llama.cpp를 CUDA로 빌드
-cd llama.cpp
+# llama.cpp를 CUDA로 재빌드
+cd engine\llama.cpp
 cmake -B build -DLLAMA_CUDA=ON
 cmake --build build --config Release
 
-# 또는 scripts/llama_server_manager.ps1에서 경로 지정
-```
-
-**Linux:**
-```bash
-# llama.cpp를 빌드
-cd llama.cpp
-cmake -B build -DLLAMA_CUDA=ON  # GPU 지원
-cmake --build build --config Release
-
-# llama-server가 PATH에 있는지 확인
-which llama-server
+# 경로 확인
+dir build\bin\Release\llama-server.exe
 ```
 
 ### CUDA 오류 (GPU 인식 안됨)
 
-```bash
+```powershell
 # CUDA Toolkit 설치 확인
 nvcc --version
 
 # GPU 인식 확인
 nvidia-smi
 
-# PyTorch GPU 테스트
-python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+# llama.cpp 빌드 로그 확인
+# CUDA가 제대로 활성화되었는지 확인
 ```
-
-llama.cpp는 CUDA를 직접 사용하므로 PyTorch 설치는 선택사항입니다.
 
 ### Out of VRAM
 
 GPU 메모리 부족 시:
-```bash
-# 환경 변수로 GPU 레이어 수 줄이기
-export LLAMA_N_GPU_LAYERS=20  # 모두(-1) 대신 일부만
+```powershell
+# llama_server_manager.ps1 수정
+# $LLAMA_PARAMS에서 --n-gpu-layers 값 변경
+# -1 → 20 (일부 레이어만 GPU에)
 
-# 또는 더 작은 quantization 모델 사용
-# Q6_K → Q4_K_M → Q4_0 순으로 VRAM 사용량 감소
+# 또는 더 작은 모델 사용
+# Q6_K → Q4_K_M → Q4_0 순으로 VRAM 감소
 ```
 
 ### llama-server 관리
 
-**Windows:**
 ```powershell
 # 서버 시작
-.\scripts\llama_server_manager.ps1 start
+powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action start
 
 # 서버 상태 확인
-.\scripts\llama_server_manager.ps1 status
+powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action status
 
 # 서버 중지
-.\scripts\llama_server_manager.ps1 stop
+powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action stop
 
 # 서버 재시작
-.\scripts\llama_server_manager.ps1 restart
-```
-
-**Linux:**
-```bash
-# 서버 시작
-./scripts/llama_server_manager.sh start
-
-# 서버 상태 확인
-./scripts/llama_server_manager.sh status
-
-# 서버 중지
-./scripts/llama_server_manager.sh stop
-
-# 서버 재시작
-./scripts/llama_server_manager.sh restart
+powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action restart
 ```
 
 ### Model not found
-```bash
+```powershell
 # models/ 디렉토리 확인
-ls models/llama-3.1-8b/
-# GGUF 모델이 있는지 확인하고 config.py 업데이트
+dir models\solar-10.7b\
+# GGUF 모델 파일 확인: solar-10.7b-instruct-v1.0.Q6_K.gguf
 ```
 
 ### JSON 파싱 오류
@@ -432,19 +383,18 @@ ls models/llama-3.1-8b/
 - 동시 요청 수 제한
 
 ### 생성 속도가 느림
-- **✅ GPU 활성화 필수!** llama.cpp를 CUDA로 빌드
-- `LLAMA_N_GPU_LAYERS=-1` 설정 확인 (모든 레이어를 GPU에)
-- llama-server 로그 확인: GPU가 실제로 사용되는지 체크
-- 더 작은 모델 사용 (8B 대신 7B 또는 3B)
-- Flash Attention 활성화 (`--flash-attn` 옵션)
+- **GPU가 실제로 사용되는지 확인**
+- `nvidia-smi`로 GPU 사용률 체크
+- llama-server 로그에서 "using CUDA" 확인
+- Flash Attention 활성화 확인 (`--flash-attn`)
 
 **GPU 사용 확인:**
-```bash
-# Windows
-nvidia-smi  # GPU 사용률 확인
+```powershell
+# GPU 사용률 모니터링
+nvidia-smi
 
 # llama-server 로그 확인
-Get-Content output/logs/llama_server.log -Tail 50
+Get-Content output\logs\llama_server.log -Tail 50
 ```
 
 ## 🆕 새로운 기능 (v2.0)
@@ -465,8 +415,9 @@ Get-Content output/logs/llama_server.log -Tail 50
 
 ## 📚 관련 문서
 
-- [JSON 신뢰성 아키텍처](docs/JSON_RELIABILITY_ARCHITECTURE.md)
 - [llama.cpp 공식 문서](https://github.com/ggerganov/llama.cpp)
+- [CUDA Toolkit 다운로드](https://developer.nvidia.com/cuda-downloads)
+- [SOLAR 10.7B 모델](https://huggingface.co/upstage/solar-10.7b-instruct-v1.0-GGUF)
 - [Stable Diffusion 프롬프트 가이드](https://stable-diffusion-art.com/prompt-guide/)
 
 ## 🎓 사용 예시
