@@ -3,7 +3,7 @@ import os
 import sys
 import atexit
 import signal
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, send_from_directory
 from pathlib import Path
 
 # Add project root to path
@@ -22,6 +22,14 @@ from src.data.series_manager import SeriesManager
 from src.data.timeline_manager import TimelineManager
 from src.common.logger import setup_logger
 from src.common.json_utils import safe_parse
+
+# Import AI Short Factory pipeline services
+from src.web.services.pipeline import (
+    generate_short,
+    get_pipeline_status,
+    check_engines_health,
+    PipelineStatus,
+)
 
 logger = setup_logger(__name__)
 
@@ -102,6 +110,13 @@ signal.signal(signal.SIGTERM, signal_handler)
 def index():
     """Main page."""
     return render_template('index.html')
+
+
+@app.route('/output/<path:filename>')
+def serve_output(filename):
+    """Serve generated output files (images, videos)."""
+    output_dir = project_root / "output"
+    return send_from_directory(output_dir, filename)
 
 
 @app.route('/api/expand-story', methods=['POST'])
@@ -604,6 +619,160 @@ def check_consistency(universe_id):
     except Exception as e:
         logger.error(f"Consistency check failed: {e}")
         return jsonify({'error': f'일관성 체크 실패: {str(e)}'}), 500
+
+
+# ============================================================================
+# AI Short Factory - Automatic Video Generation APIs
+# ============================================================================
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Check health of all backend engines (llama-server, ComfyUI, WAN2.2)."""
+    try:
+        health = check_engines_health()
+
+        return jsonify({
+            'success': True,
+            'ok': health['overall'],
+            'engines': {
+                'llama_server': health['llama_server'],
+                'comfyui': health['comfyui'],
+                'wan22': health['wan22']
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return jsonify({
+            'success': False,
+            'ok': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/shorts/generate', methods=['POST'])
+def generate_short_api():
+    """Generate a complete AI short video (fully automatic pipeline).
+
+    Request JSON:
+    {
+        "title_hint": "optional string",
+        "theme": "string (required)",
+        "style": "cinematic / anime / watercolor / etc (default: cinematic)",
+        "scene_count": 4 (default)
+    }
+
+    Response JSON:
+    {
+        "success": true,
+        "short_id": "uuid-or-timestamp",
+        "title": "string",
+        "synopsis": "string",
+        "scenes": [
+            {
+                "id": 1,
+                "image_path": "relative/path/to/png",
+                "video_path": "relative/path/to/scene_mp4",
+                "prompt": "string"
+            }
+        ],
+        "final_video_path": "relative/path/to/short_final.mp4",
+        "duration_sec": float
+    }
+    """
+    try:
+        data = request.get_json()
+        theme = data.get('theme', '').strip()
+        style = data.get('style', 'cinematic').strip()
+        scene_count = int(data.get('scene_count', 4))
+        title_hint = data.get('title_hint', '').strip() or None
+
+        if not theme:
+            return jsonify({'error': 'Theme is required'}), 400
+
+        if scene_count < 1 or scene_count > 12:
+            return jsonify({'error': 'Scene count must be between 1 and 12'}), 400
+
+        logger.info(f"Starting short generation: theme='{theme}', style='{style}', scenes={scene_count}")
+
+        # Run the full pipeline (synchronous for now)
+        # TODO: Move to background job/queue for async processing
+        result = generate_short(
+            theme=theme,
+            style=style,
+            scene_count=scene_count,
+            title_hint=title_hint,
+        )
+
+        return jsonify({
+            'success': True,
+            'short_id': result['short_id'],
+            'title': result['title'],
+            'synopsis': result['synopsis'],
+            'scenes': result['scenes'],
+            'final_video_path': result['final_video_path'],
+            'duration_sec': result['duration_sec'],
+            'status': result['status']
+        })
+
+    except Exception as e:
+        logger.error(f"Short generation failed: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Short generation failed: {str(e)}'
+        }), 500
+
+
+@app.route('/api/shorts/<short_id>/status', methods=['GET'])
+def get_short_status(short_id):
+    """Get the status of a short video generation pipeline.
+
+    Returns progress & status:
+    - pending, generating_story, generating_images, generating_videos,
+      concatenating, done, error
+
+    Response JSON:
+    {
+        "success": true,
+        "short_id": "string",
+        "status": "string",
+        "progress": 0-100,
+        "current_step": "string",
+        "error": "string or null",
+        "title": "string",
+        "synopsis": "string",
+        "scenes": [...],
+        "final_video_path": "string or null"
+    }
+    """
+    try:
+        state = get_pipeline_status(short_id)
+
+        if state is None:
+            return jsonify({
+                'success': False,
+                'error': f'Short {short_id} not found'
+            }), 404
+
+        return jsonify({
+            'success': True,
+            'short_id': short_id,
+            'status': state.get('status', PipelineStatus.PENDING),
+            'progress': state.get('progress', 0),
+            'current_step': state.get('current_step', ''),
+            'error': state.get('error'),
+            'title': state.get('title', ''),
+            'synopsis': state.get('synopsis', ''),
+            'scenes': state.get('scenes', []),
+            'final_video_path': state.get('final_video_path')
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to get status for {short_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 if __name__ == '__main__':
