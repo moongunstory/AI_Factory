@@ -123,9 +123,7 @@ class LlamaClient:
         Raises:
             RuntimeError: If generation fails
         """
-        # Build the full prompt with system prompt if provided
         if system_prompt:
-            # Format expected by Solar-10.7B-Instruct
             full_prompt = f"### System:\n{system_prompt}\n\n### User:\n{prompt}\n\n### Assistant:\n"
         else:
             full_prompt = prompt
@@ -136,9 +134,10 @@ class LlamaClient:
             "n_predict": max_tokens or self.max_tokens,
             "temperature": temperature or self.temperature,
             "top_p": self.top_p,
-            "stream": stream,
-            "cache_prompt": True,  # 프롬프트 캐싱 활성화 (속도 향상)
-            "stop": ["### User:", "### System:"],  # Stop sequences
+            "top_k": -1,
+            "min_p": 0,
+            "repeat_penalty": 1.0,
+            "seed": -1
         }
 
         logger.info(f"Generating text (prompt length: {len(full_prompt)} chars)")
@@ -227,7 +226,7 @@ You MUST respond with ONLY valid JSON.
 - END with } or ]
 - MUST be valid, parseable JSON"""
 
-        json_system_prompt = (system_prompt or "") + json_enforcement
+        json_system_prompt = (system_prompt or "").strip() + "\n" + json_enforcement
 
         # Generate output with enhanced prompt
         output = self.generate(prompt, system_prompt=json_system_prompt, **kwargs)

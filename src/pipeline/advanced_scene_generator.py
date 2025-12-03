@@ -18,6 +18,8 @@ Your task is to analyze a full story and break it down into 10-15 major story be
 
 Story beats are the key narrative moments that drive the plot forward. Each beat should represent a significant event, decision, or turning point.
 
+All descriptive text must be generated in both Korean (for display) and English (for prompts).
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CRITICAL JSON OUTPUT REQUIREMENTS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -30,11 +32,13 @@ CRITICAL JSON OUTPUT REQUIREMENTS:
 
 Required JSON Schema:
 {
-  "story_summary": "One paragraph summary of the full narrative",
+  "story_summary_ko": "전체 서사에 대한 한 문단 요약",
+  "story_summary_en": "One paragraph summary of the full narrative",
   "beats": [
     {
       "beat_number": 1,
-      "description": "The warrior prepares for the journey in darkness",
+      "description_ko": "전사는 어둠 속에서 여정을 준비합니다",
+      "description_en": "The warrior prepares for the journey in darkness",
       "narrative_function": "setup/rising_action/climax/resolution"
     }
   ],
@@ -44,6 +48,7 @@ Required JSON Schema:
 Guidelines:
 - Create 10-15 story beats
 - Each beat should be a complete narrative moment
+- Descriptions and summary MUST be in both Korean (ko) and English (en)
 - Include clear beginning, rising action, climax, and resolution beats
 - Beats should flow naturally and build tension
 - Descriptions should be concise but clear
@@ -54,6 +59,8 @@ REMEMBER: Output ONLY the JSON object. Nothing else."""
     CHARACTER_SHEET_SYSTEM_PROMPT = """You are an expert character designer for visual media.
 
 Your task is to create detailed character sheets for the main characters in a story.
+
+All descriptive text (name, physical, costume, etc.) must be generated in both Korean (for display) and English (for prompts).
 
 Character sheets should include:
 - Physical appearance (face, body, distinctive features)
@@ -76,12 +83,17 @@ Required JSON Schema:
 {
   "characters": [
     {
-      "name": "Warrior",
+      "name_ko": "전사",
+      "name_en": "Warrior",
       "role": "protagonist",
-      "physical": "Tall muscular man, battle-scarred face, short dark hair, piercing blue eyes",
-      "costume": "Dark leather armor with silver plates, worn travel cloak, heavy boots",
-      "equipment": "Ancient rune-engraved longsword, small shield with dragon emblem",
-      "personality_visual": "Determined expression, confident stance, weathered appearance",
+      "physical_ko": "키가 크고 근육질의 남자, 전투로 흉터가 생긴 얼굴, 짧은 검은 머리, 날카로운 파란 눈",
+      "physical_en": "Tall muscular man, battle-scarred face, short dark hair, piercing blue eyes",
+      "costume_ko": "은색 판이 달린 어두운 가죽 갑옷, 낡은 여행 망토, 무거운 부츠",
+      "costume_en": "Dark leather armor with silver plates, worn travel cloak, heavy boots",
+      "equipment_ko": "고대 룬이 새겨진 롱소드, 용 문장이 있는 작은 방패",
+      "equipment_en": "Ancient rune-engraved longsword, small shield with dragon emblem",
+      "personality_visual_ko": "결단력 있는 표정, 자신감 있는 자세, 풍화된 외모",
+      "personality_visual_en": "Determined expression, confident stance, weathered appearance",
       "consistency_tags": "same warrior, same armor design, same sword, consistent character"
     }
   ]
@@ -90,6 +102,7 @@ Required JSON Schema:
 Guidelines:
 - Identify 2-4 main characters from the story
 - Be VERY specific and detailed
+- All descriptions MUST be in both Korean (ko) and English (en)
 - Include elements that ensure visual consistency
 - Focus on visually distinctive features
 - Add consistency tags for Stable Diffusion
@@ -228,7 +241,7 @@ Create a clear narrative arc with proper pacing."""
 {expanded_story}
 
 Story Summary:
-{story_beats.get('story_summary', '')}
+{story_beats.get('story_summary_en', story_beats.get('story_summary', ''))}
 
 {theme_context}
 
@@ -282,11 +295,15 @@ Ensure the character designs fit the visual theme and are highly specific for co
         # Prepare character descriptions for consistency
         char_descriptions = []
         for char in character_sheets.get('characters', []):
+            name = char.get('name_en', char.get('name', 'Unknown'))
+            physical = char.get('physical_en', char.get('physical', ''))
+            costume = char.get('costume_en', char.get('costume', ''))
+            
             desc = (
-                f"- {char.get('name', 'Unknown')} ({char.get('role', 'character')}): "
-                f"{char.get('physical', '')}, {char.get('costume', '')}"
+                f"- {name} ({char.get('role', 'character')}): "
+                f"{physical}, {costume}"
             )
-            equipment = char.get('equipment', '')
+            equipment = char.get('equipment_en', char.get('equipment', ''))
             if equipment:
                 desc += f", {equipment}"
             consistency = char.get('consistency_tags', '')
@@ -298,8 +315,10 @@ Ensure the character designs fit the visual theme and are highly specific for co
 
         # Prepare beats summary
         beats_list = []
-        for beat in story_beats.get('beats', []):
-            beats_list.append(f"Beat {beat['beat_number']}: {beat['description']}")
+        for i, beat in enumerate(story_beats.get('beats', [])):
+            beat_num = beat.get('beat_number', i + 1)
+            description = beat.get('description_en', beat.get('description', ''))
+            beats_list.append(f"Beat {beat_num}: {description}")
 
         beats_context = "\n".join(beats_list)
 

@@ -564,9 +564,10 @@ function displayExpandedStory() {
         AppState.storyBeats.beats.forEach(beat => {
             const beatEl = document.createElement('div');
             beatEl.className = 'beat-item';
+            const description = beat.description_ko || beat.description_en || beat.description || '';
             beatEl.innerHTML = `
                 <span class="beat-number">Beat ${beat.beat_number}</span>
-                <span class="beat-description">${beat.description}</span>
+                <span class="beat-description">${description}</span>
                 <div class="beat-function">${beat.narrative_function}</div>
             `;
             beatsContainer.appendChild(beatEl);
@@ -581,12 +582,18 @@ function displayExpandedStory() {
         AppState.characterSheets.characters.forEach(char => {
             const charEl = document.createElement('div');
             charEl.className = 'character-card';
+            
+            const name = char.name_ko || char.name_en || char.name || 'Unknown';
+            const physical = char.physical_ko || char.physical_en || char.physical || '';
+            const costume = char.costume_ko || char.costume_en || char.costume || '';
+            const equipment = char.equipment_ko || char.equipment_en || char.equipment || '';
+
             charEl.innerHTML = `
-                <div class="character-name">${char.name}</div>
+                <div class="character-name">${name}</div>
                 <span class="character-role">${char.role}</span>
-                <div class="character-detail"><strong>외형:</strong> ${char.physical}</div>
-                <div class="character-detail"><strong>복장:</strong> ${char.costume}</div>
-                ${char.equipment ? `<div class="character-detail"><strong>장비:</strong> ${char.equipment}</div>` : ''}
+                <div class="character-detail"><strong>외형:</strong> ${physical}</div>
+                <div class="character-detail"><strong>복장:</strong> ${costume}</div>
+                ${equipment ? `<div class="character-detail"><strong>장비:</strong> ${equipment}</div>` : ''}
             `;
             charactersContainer.appendChild(charEl);
         });

@@ -91,12 +91,11 @@ class ServerManager:
             "--model", str(self.model_path),
             "--ctx-size", "4096",       # Full context for single request
             "--batch-size", "512",      # Optimized for single request (reduced from 2048)
-            # --ubatch-size removed: use default (512), no per-slot concept needed
             "--threads", "4",
             "--n-gpu-layers", "-1",     # Load all layers to GPU
             "--parallel", "1",          # Single slot enforced
-            # --cont-batching removed: no multi-request dynamic batching needed
-            "--flash-attn",
+            "--ctx-checkpoints", "1",   # No slot division
+            "--flash-attn", "on",       # Correctly set to on
             "--verbose"
         ]
 

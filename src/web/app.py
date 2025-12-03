@@ -206,6 +206,15 @@ def generate_prompts():
             'character_sheets': character_sheets
         })
 
+    except RuntimeError as e:
+        logger.error(f"Prompt generation failed due to a runtime error: {e}")
+        if "Failed to connect to llama-server" in str(e):
+            error_message = (
+                "AI 서버(llama-server)가 실행되고 있지 않습니다. "
+                "이 창을 닫고, 프로젝트 폴더의 'run.bat' 파일을 실행하여 프로그램을 시작해주세요."
+            )
+            return jsonify({'error': error_message}), 500
+        return jsonify({'error': f'프롬프트 생성 중 런타임 오류 발생: {str(e)}'}), 500
     except Exception as e:
         logger.error(f"Prompt generation failed: {e}")
         return jsonify({'error': f'프롬프트 생성 실패: {str(e)}'}), 500
