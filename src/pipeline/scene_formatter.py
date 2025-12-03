@@ -34,7 +34,8 @@ class SceneFormatter:
         output.append("=" * 80)
         output.append("[스토리 요약]")
         output.append("=" * 80)
-        output.append(result.get('story_summary', 'N/A'))
+        # Prefer Korean (_ko) field, fallback to non-suffixed field
+        output.append(result.get('story_summary_ko', result.get('story_summary', 'N/A')))
         output.append("")
 
         # Story Beats
@@ -43,7 +44,8 @@ class SceneFormatter:
         output.append("=" * 80)
         for beat in result.get('story_beats', []):
             beat_num = beat.get('beat_number', '?')
-            description = beat.get('description', 'N/A')
+            # Prefer Korean (_ko) field, fallback to non-suffixed field
+            description = beat.get('description_ko', beat.get('description', 'N/A'))
             function = beat.get('narrative_function', 'N/A')
             output.append(f"{beat_num}. {description}")
             output.append(f"   기능: {function}")
@@ -54,13 +56,14 @@ class SceneFormatter:
         output.append("[캐릭터]")
         output.append("=" * 80)
         for char in result.get('characters', []):
-            name = char.get('name', 'N/A')
+            # Prefer Korean (_ko) fields, fallback to non-suffixed fields
+            name = char.get('name_ko', char.get('name', 'N/A'))
             role = char.get('role', 'N/A')
             output.append(f"● {name} ({role})")
-            output.append(f"  외형: {char.get('physical', 'N/A')}")
-            output.append(f"  의상: {char.get('costume', 'N/A')}")
-            output.append(f"  장비: {char.get('equipment', 'N/A')}")
-            output.append(f"  성격적 특징: {char.get('personality_visual', 'N/A')}")
+            output.append(f"  외형: {char.get('physical_ko', char.get('physical', 'N/A'))}")
+            output.append(f"  의상: {char.get('costume_ko', char.get('costume', 'N/A'))}")
+            output.append(f"  장비: {char.get('equipment_ko', char.get('equipment', 'N/A'))}")
+            output.append(f"  성격적 특징: {char.get('personality_visual_ko', char.get('personality_visual', 'N/A'))}")
             output.append(f"  일관성 태그: {char.get('consistency_tags', 'N/A')}")
             output.append("")
 
@@ -141,14 +144,16 @@ class SceneFormatter:
 
         # Story Summary
         output.append("## 스토리 요약")
-        output.append(result.get('story_summary', 'N/A'))
+        # Prefer Korean (_ko) field, fallback to non-suffixed field
+        output.append(result.get('story_summary_ko', result.get('story_summary', 'N/A')))
         output.append("")
 
         # Story Beats
         output.append("## 스토리 비트")
         for beat in result.get('story_beats', []):
             beat_num = beat.get('beat_number', '?')
-            description = beat.get('description', 'N/A')
+            # Prefer Korean (_ko) field, fallback to non-suffixed field
+            description = beat.get('description_ko', beat.get('description', 'N/A'))
             function = beat.get('narrative_function', 'N/A')
             output.append(f"{beat_num}. **{description}**")
             output.append(f"   - 기능: *{function}*")
@@ -158,13 +163,14 @@ class SceneFormatter:
         # Characters
         output.append("## 캐릭터")
         for char in result.get('characters', []):
-            name = char.get('name', 'N/A')
+            # Prefer Korean (_ko) fields, fallback to non-suffixed fields
+            name = char.get('name_ko', char.get('name', 'N/A'))
             role = char.get('role', 'N/A')
             output.append(f"### {name} ({role})")
-            output.append(f"- **외형:** {char.get('physical', 'N/A')}")
-            output.append(f"- **의상:** {char.get('costume', 'N/A')}")
-            output.append(f"- **장비:** {char.get('equipment', 'N/A')}")
-            output.append(f"- **성격적 특징:** {char.get('personality_visual', 'N/A')}")
+            output.append(f"- **외형:** {char.get('physical_ko', char.get('physical', 'N/A'))}")
+            output.append(f"- **의상:** {char.get('costume_ko', char.get('costume', 'N/A'))}")
+            output.append(f"- **장비:** {char.get('equipment_ko', char.get('equipment', 'N/A'))}")
+            output.append(f"- **성격적 특징:** {char.get('personality_visual_ko', char.get('personality_visual', 'N/A'))}")
             output.append(f"- **일관성 태그:** {char.get('consistency_tags', 'N/A')}")
             output.append("")
 

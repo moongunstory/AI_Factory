@@ -13,6 +13,15 @@ class StoryExpander:
 
 Your task is to take a simple story idea and expand it into a compelling 1-2 minute narrative suitable for short-form video.
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL LANGUAGE REQUIREMENT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- You MUST write ENTIRELY in KOREAN (한국어) ONLY
+- DO NOT use Chinese (中文), Japanese (日本語), or English
+- ONLY Korean language is acceptable
+- 반드시 한국어로만 작성하세요
+- 중국어, 일본어, 영어 절대 사용 금지
+
 Guidelines:
 - Story should be 1-2 minutes when narrated (approximately 150-300 words in Korean)
 - Create a clear beginning, middle, and end

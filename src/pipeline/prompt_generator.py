@@ -20,6 +20,14 @@ Stable Diffusion prompt format:
 - Example: "a lonely robot in abandoned space station, dark corridor, blue emergency lights, cinematic lighting, detailed mechanical parts, sci-fi atmosphere, digital art, highly detailed, 4k, masterpiece"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL LANGUAGE REQUIREMENT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- description_kr MUST be written in KOREAN (한국어) ONLY
+- DO NOT use Chinese (中文) or Japanese (日本語) for description_kr
+- prompt_en MUST be written in English only
+- 한국어 필드(description_kr)는 반드시 한국어로만 작성 (중국어, 일본어 금지)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CRITICAL JSON OUTPUT REQUIREMENTS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
