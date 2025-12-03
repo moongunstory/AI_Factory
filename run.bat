@@ -6,7 +6,7 @@ REM ==========================================
 setlocal enabledelayedexpansion
 
 set "PROJECT_DIR=%~dp0"
-set "LLAMA_MANAGER=%PROJECT_DIR%llama_server_manager.ps1"
+set "PY_MANAGER=%PROJECT_DIR%src\manage_server.py"
 set "FLASK_APP=%PROJECT_DIR%src\web\app.py"
 
 echo.
@@ -64,7 +64,7 @@ REM 2. Clean up orphan processes
 REM ==========================================
 
 echo [2/4] Cleaning up previous processes...
-powershell -ExecutionPolicy Bypass -File "%LLAMA_MANAGER%" -Action cleanup >nul 2>&1
+python "%PY_MANAGER%" cleanup
 echo [OK] Cleanup complete
 echo.
 
@@ -76,9 +76,9 @@ echo [3/4] Starting llama-server with GPU support...
 echo.
 
 REM Check if already running
-powershell -ExecutionPolicy Bypass -File "%LLAMA_MANAGER%" -Action status >nul 2>&1
+python "%PY_MANAGER%" status >nul 2>&1
 if errorlevel 1 (
-    powershell -ExecutionPolicy Bypass -File "%LLAMA_MANAGER%" -Action start
+    python "%PY_MANAGER%" start
 ) else (
     echo [OK] llama-server already running
 )
@@ -111,6 +111,6 @@ echo.
 echo [INFO] Flask has stopped.
 echo [INFO] llama-server is still running in the background.
 echo [INFO] To stop llama-server, run:
-echo        powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action stop
+echo        python src\manage_server.py stop
 echo.
 pause

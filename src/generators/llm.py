@@ -125,8 +125,8 @@ class LlamaClient:
         """
         # Build the full prompt with system prompt if provided
         if system_prompt:
-            # llama.cpp format: system prompt + user prompt
-            full_prompt = f"<|system|>\n{system_prompt}\n<|user|>\n{prompt}\n<|assistant|>\n"
+            # Format expected by Solar-10.7B-Instruct
+            full_prompt = f"### System:\n{system_prompt}\n\n### User:\n{prompt}\n\n### Assistant:\n"
         else:
             full_prompt = prompt
 
@@ -138,7 +138,7 @@ class LlamaClient:
             "top_p": self.top_p,
             "stream": stream,
             "cache_prompt": True,  # 프롬프트 캐싱 활성화 (속도 향상)
-            "stop": ["<|user|>", "<|system|>"],  # Stop sequences
+            "stop": ["### User:", "### System:"],  # Stop sequences
         }
 
         logger.info(f"Generating text (prompt length: {len(full_prompt)} chars)")

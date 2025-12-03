@@ -223,7 +223,7 @@ python -m src --list-themes
 LLAMA_CTX_SIZE=4096              # 컨텍스트 크기
 LLAMA_BATCH_SIZE=2048            # 배치 크기
 LLAMA_N_GPU_LAYERS=-1            # GPU 레이어 수 (-1 = 모두)
-LLAMA_N_PARALLEL=8               # 동시 요청 수
+LLAMA_N_PARALLEL=1               # 동시 요청 수
 
 # LLM 파라미터
 LLM_TEMPERATURE=0.7              # 창의성 (0.0-1.0)
@@ -241,7 +241,7 @@ LLAMA_SERVER_PORT=8080
 - `LLAMA_CTX_SIZE=4096` - 충분한 컨텍스트
 - `LLAMA_BATCH_SIZE=2048` - 최적 배치 크기
 - `LLAMA_N_GPU_LAYERS=-1` - 모든 레이어 GPU에
-- `LLAMA_N_PARALLEL=8` - 동시 요청 8개
+- `LLAMA_N_PARALLEL=1` - 동시 요청 1개
 - Flash Attention 활성화
 
 **⚡ VRAM 부족 시 (8GB 이하):**

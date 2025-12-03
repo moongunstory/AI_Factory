@@ -34,7 +34,7 @@ class Config:
     # llama-server 최적화 파라미터 (GPU 지원)
     LLAMA_CTX_SIZE = int(os.getenv("LLAMA_CTX_SIZE", "4096"))  # GPU 환경: 더 큰 컨텍스트 가능
     LLAMA_BATCH_SIZE = int(os.getenv("LLAMA_BATCH_SIZE", "2048"))  # GPU 환경: 큰 배치 크기
-    LLAMA_N_PARALLEL = int(os.getenv("LLAMA_N_PARALLEL", "8"))  # GPU: 더 많은 동시 요청 처리
+    LLAMA_N_PARALLEL = int(os.getenv("LLAMA_N_PARALLEL", "1"))  # GPU: 더 많은 동시 요청 처리
     LLAMA_N_GPU_LAYERS = int(os.getenv("LLAMA_N_GPU_LAYERS", "-1"))  # -1 = 모든 레이어를 GPU에 로드
 
     # LLM parameters (클라이언트 요청 시 사용)
