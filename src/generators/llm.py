@@ -20,6 +20,12 @@ from urllib3.util.retry import Retry
 from ..common.config import Config
 from ..common.logger import setup_logger
 from ..common.json_utils import safe_parse
+from ..common.language_validator import (
+    contains_chinese,
+    validate_korean_fields,
+    find_non_korean_chars,
+    log_language_stats
+)
 
 logger = setup_logger(__name__)
 
@@ -190,19 +196,22 @@ class LlamaClient:
         system_prompt: Optional[str] = None,
         fallback: Optional[Dict[str, Any]] = None,
         strict: bool = True,
+        korean_field_names: Optional[list] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """Generate JSON output using llama-server API with automatic repair.
 
-        This method uses a two-layer approach for maximum reliability:
+        This method uses a three-layer approach for maximum reliability:
         1. Enhanced system prompt that strictly enforces JSON output format
         2. Automatic JSON repair using safe_parse() if output is malformed
+        3. Korean language validation with retry mechanism (if korean_field_names provided)
 
         Args:
             prompt: The user prompt
             system_prompt: Optional system prompt
             fallback: Fallback value if JSON parsing completely fails
             strict: If True, raise exception on parse failure (default: True)
+            korean_field_names: List of field names that must be in Korean (enables validation)
             **kwargs: Additional arguments for generate()
 
         Returns:
@@ -228,30 +237,77 @@ You MUST respond with ONLY valid JSON.
 
         json_system_prompt = (system_prompt or "").strip() + "\n" + json_enforcement
 
-        # Generate output with enhanced prompt
-        output = self.generate(prompt, system_prompt=json_system_prompt, **kwargs)
+        # Layer 3: Korean validation with retry mechanism
+        max_retries = Config.KOREAN_LANGUAGE_RETRIES if (korean_field_names and Config.ENFORCE_KOREAN_ONLY) else 1
 
-        logger.debug(f"Raw LLM output (first 200 chars): {output[:200]}")
+        for attempt in range(max_retries):
+            # Generate output with enhanced prompt
+            output = self.generate(prompt, system_prompt=json_system_prompt, **kwargs)
 
-        # Layer 2: Use safe_parse with automatic repair
-        try:
-            result = safe_parse(output, fallback=fallback, strict=strict)
-            logger.info("JSON parsed successfully from LLM output")
-            return result
+            logger.debug(f"Raw LLM output (first 200 chars): {output[:200]}")
 
-        except ValueError as e:
-            logger.error(f"JSON parsing failed even after repair: {e}")
-            logger.debug(f"Full output: {output}")
+            # Layer 2: Use safe_parse with automatic repair
+            try:
+                result = safe_parse(output, fallback=fallback, strict=strict)
+                logger.info("JSON parsed successfully from LLM output")
 
-            if strict:
-                raise RuntimeError(
-                    f"Failed to parse JSON from LLM output even after repair.\n"
-                    f"Error: {e}\n"
-                    f"Output preview: {output[:500]}..."
-                )
+                # Layer 3: Validate Korean fields if specified
+                if korean_field_names and Config.ENFORCE_KOREAN_ONLY:
+                    is_valid, errors = validate_korean_fields(
+                        result,
+                        korean_field_names,
+                        strict=Config.KOREAN_VALIDATION_STRICT
+                    )
 
-            # Return fallback if not strict
-            return fallback or {}
+                    if not is_valid:
+                        logger.warning(f"❌ 한국어 검증 실패 (시도 {attempt + 1}/{max_retries}): {errors}")
+
+                        # 한자 사용 예시 로그
+                        for error in errors[:3]:  # 처음 3개만 로그
+                            logger.warning(f"   - {error}")
+
+                        if attempt < max_retries - 1:
+                            # 재시도 시 프롬프트 강화
+                            logger.info(f"🔄 한국어 순수성 확보를 위해 재시도합니다...")
+
+                            korean_warning = """
+
+⚠️⚠️⚠️ 경고: 이전 응답에서 한자(Chinese characters)가 감지되었습니다! ⚠️⚠️⚠️
+반드시 순수 한국어(한글)로만 작성하세요!
+
+잘못된 예시: "破甚的한", "优秀한 记者", "全 国"  ← 이렇게 쓰지 마세요!
+올바른 예시: "폐허가 된", "우수한 기자", "전국"  ← 이렇게 순수 한글로만!
+
+한국어 필드는 반드시 한글 음절(가-힣)로만 작성하세요."""
+
+                            json_system_prompt = json_system_prompt + korean_warning
+                            continue  # 재시도
+                        else:
+                            # 최종 실패 - 경고만 하고 결과 반환
+                            logger.error(f"⚠️ 최종 한국어 검증 실패. 한자가 포함된 결과를 반환합니다.")
+                            logger.error(f"검증 오류: {errors}")
+                    else:
+                        logger.info(f"✅ 한국어 검증 통과")
+
+                return result
+
+            except ValueError as e:
+                logger.error(f"JSON parsing failed even after repair: {e}")
+                logger.debug(f"Full output: {output}")
+
+                if attempt < max_retries - 1:
+                    logger.info(f"🔄 JSON 파싱 실패로 재시도합니다...")
+                    continue  # 재시도
+
+                if strict:
+                    raise RuntimeError(
+                        f"Failed to parse JSON from LLM output even after repair.\n"
+                        f"Error: {e}\n"
+                        f"Output preview: {output[:500]}..."
+                    )
+
+                # Return fallback if not strict
+                return fallback or {}
 
     def is_server_ready(self) -> bool:
         """Check if llama-server is ready to accept requests.

@@ -20,12 +20,19 @@ Stable Diffusion prompt format:
 - Example: "a lonely robot in abandoned space station, dark corridor, blue emergency lights, cinematic lighting, detailed mechanical parts, sci-fi atmosphere, digital art, highly detailed, 4k, masterpiece"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITICAL LANGUAGE REQUIREMENT:
+⚠️ 절대적 언어 규칙 (CHARACTER-LEVEL REQUIREMENT):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- description_kr MUST be written in KOREAN (한국어) ONLY
-- DO NOT use Chinese (中文) or Japanese (日本語) for description_kr
-- prompt_en MUST be written in English only
-- 한국어 필드(description_kr)는 반드시 한국어로만 작성 (중국어, 일본어 금지)
+✅ description_kr MUST use: Korean Hangul ONLY (가-힣, U+AC00-U+D7A3)
+❌ description_kr NEVER use: Chinese Hanzi (汉字, U+4E00-U+9FFF)
+❌ description_kr NEVER use: Japanese (ひらがな, カタカナ)
+✅ prompt_en MUST be written in English only
+
+올바른 예시 (CORRECT): "로봇이 버려진 우주 정거장에서 홀로 있다"
+잘못된 예시 (WRONG): "機器人이 廢棄된 宇宙" ← DO NOT DO THIS!
+잘못된 예시 (WRONG): "孤獨한 로봇" ← DO NOT DO THIS!
+
+한국어는 한글(Hangul)로 작성하며, 한자(Hanzi/汉字)와는 완전히 다릅니다!
+한국어 필드(description_kr)에는 순수 한글만 사용하세요!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CRITICAL JSON OUTPUT REQUIREMENTS:
@@ -107,6 +114,7 @@ Determine the optimal number of scenes and create detailed prompts for each."""
                 system_prompt=self.SYSTEM_PROMPT,
                 temperature=temperature,
                 max_tokens=2048,
+                korean_field_names=['description_kr']
             )
 
             num_scenes = len(result.get('scenes', []))
@@ -161,6 +169,7 @@ Start with { and end with }. Nothing before or after."""
                 system_prompt=regenerate_system,
                 temperature=temperature,
                 max_tokens=512,
+                korean_field_names=['description_kr']
             )
 
             logger.info(f"Scene {scene_number} regenerated successfully")

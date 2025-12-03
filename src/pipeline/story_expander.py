@@ -14,13 +14,21 @@ class StoryExpander:
 Your task is to take a simple story idea and expand it into a compelling 1-2 minute narrative suitable for short-form video.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITICAL LANGUAGE REQUIREMENT:
+⚠️ 절대적 언어 규칙 (CHARACTER-LEVEL REQUIREMENT):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- You MUST write ENTIRELY in KOREAN (한국어) ONLY
-- DO NOT use Chinese (中文), Japanese (日本語), or English
-- ONLY Korean language is acceptable
-- 반드시 한국어로만 작성하세요
-- 중국어, 일본어, 영어 절대 사용 금지
+✅ MUST USE: Korean Hangul ONLY (가-힣, ㄱ-ㅎ, ㅏ-ㅣ, U+AC00-U+D7A3)
+❌ NEVER USE: Chinese Hanzi (汉字, 中文, U+4E00-U+9FFF)
+❌ NEVER USE: Japanese (ひらがな, カタカナ, 日本語)
+❌ NEVER USE: English for Korean content
+
+올바른 예시 (CORRECT): "폐허가 된 도심 속, 고립된 건물에 달려간다"
+잘못된 예시 (WRONG): "破甚的한 도심" ← DO NOT DO THIS!
+잘못된 예시 (WRONG): "优秀한 记者" ← DO NOT DO THIS!
+잘못된 예시 (WRONG): "全 国 에" ← DO NOT DO THIS!
+
+반드시 순수 한글(가-힣)로만 작성하세요!
+중국어 한자를 절대 사용하지 마세요!
+한국어는 한글(Hangul)로 작성하며, 한자(Hanzi)와는 완전히 다릅니다!
 
 Guidelines:
 - Story should be 1-2 minutes when narrated (approximately 150-300 words in Korean)
@@ -28,9 +36,9 @@ Guidelines:
 - Include vivid visual descriptions that work well for video
 - Make it engaging and emotionally resonant
 - Keep the pacing fast and dynamic
-- Write ENTIRELY in Korean (한국어로만 작성)
+- Write ENTIRELY in Korean Hangul (한국어 한글로만 작성)
 
-Respond with ONLY the expanded story in Korean. No additional explanations or metadata."""
+Respond with ONLY the expanded story in pure Korean Hangul. No additional explanations or metadata."""
 
     def __init__(self, llm_client: Optional[LlamaClient] = None):
         """Initialize the story expander.
@@ -41,12 +49,12 @@ Respond with ONLY the expanded story in Korean. No additional explanations or me
         self.llm = llm_client or LlamaClient()
         logger.info("StoryExpander initialized")
 
-    def expand(self, simple_idea: str, temperature: float = 0.8) -> str:
+    def expand(self, simple_idea: str, temperature: float = 0.6) -> str:
         """Expand a simple story idea into a full short story.
 
         Args:
             simple_idea: Simple story idea from user
-            temperature: Sampling temperature for creativity (0.0-1.0)
+            temperature: Sampling temperature (낮춤: 언어 순수성 향상)
 
         Returns:
             Expanded story in Korean

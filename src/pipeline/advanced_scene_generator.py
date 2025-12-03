@@ -21,12 +21,19 @@ Story beats are the key narrative moments that drive the plot forward. Each beat
 All descriptive text must be generated in both Korean (for display) and English (for prompts).
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITICAL LANGUAGE REQUIREMENT:
+⚠️ 절대적 언어 규칙 (CHARACTER-LEVEL REQUIREMENT):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Korean fields (_ko) MUST be written in KOREAN (한국어) ONLY
-- DO NOT use Chinese (中文) or Japanese (日本語) for Korean fields
-- English fields (_en) MUST be written in English only
-- 한국어 필드는 반드시 한국어로만 작성 (중국어, 일본어 금지)
+✅ Korean fields (_ko) MUST use: Korean Hangul ONLY (가-힣, U+AC00-U+D7A3)
+❌ Korean fields (_ko) NEVER use: Chinese Hanzi (汉字, U+4E00-U+9FFF)
+❌ Korean fields (_ko) NEVER use: Japanese (ひらがな, カタカナ)
+✅ English fields (_en) MUST be written in English only
+
+올바른 예시 (CORRECT): "전사는 어둠 속에서 여정을 준비합니다"
+잘못된 예시 (WRONG): "前士는 暗黑 속에서" ← DO NOT DO THIS!
+잘못된 예시 (WRONG): "優秀한 戰士" ← DO NOT DO THIS!
+
+한국어는 한글(Hangul)로 작성하며, 한자(Hanzi/汉字)와는 완전히 다릅니다!
+한국어 필드(_ko)에는 순수 한글만 사용하세요!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CRITICAL JSON OUTPUT REQUIREMENTS:
@@ -78,12 +85,19 @@ Character sheets should include:
 - Unique identifying elements for consistency
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITICAL LANGUAGE REQUIREMENT:
+⚠️ 절대적 언어 규칙 (CHARACTER-LEVEL REQUIREMENT):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Korean fields (_ko) MUST be written in KOREAN (한국어) ONLY
-- DO NOT use Chinese (中文) or Japanese (日本語) for Korean fields
-- English fields (_en) MUST be written in English only
-- 한국어 필드는 반드시 한국어로만 작성 (중국어, 일본어 금지)
+✅ Korean fields (_ko) MUST use: Korean Hangul ONLY (가-힣, U+AC00-U+D7A3)
+❌ Korean fields (_ko) NEVER use: Chinese Hanzi (汉字, U+4E00-U+9FFF)
+❌ Korean fields (_ko) NEVER use: Japanese (ひらがな, カタカナ)
+✅ English fields (_en) MUST be written in English only
+
+올바른 예시 (CORRECT): "키가 크고 근육질의 남자"
+잘못된 예시 (WRONG): "高大한 男子" ← DO NOT DO THIS!
+잘못된 예시 (WRONG): "強力한 武器" ← DO NOT DO THIS!
+
+한국어는 한글(Hangul)로 작성하며, 한자(Hanzi/汉字)와는 완전히 다릅니다!
+한국어 필드(_ko)에는 순수 한글만 사용하세요!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CRITICAL JSON OUTPUT REQUIREMENTS:
@@ -146,12 +160,19 @@ Scene Duration Rules:
 - Total duration: 50-70 seconds (average ~60 seconds)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITICAL LANGUAGE REQUIREMENT:
+⚠️ 절대적 언어 규칙 (CHARACTER-LEVEL REQUIREMENT):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Korean fields (prompt_ko, description in Korean) MUST be in KOREAN (한국어) ONLY
-- DO NOT use Chinese (中文) or Japanese (日本語) for Korean text
-- English fields (prompt_en) MUST be in English only
-- 한국어 필드는 반드시 한국어로만 작성 (중국어, 일본어 금지)
+✅ Korean fields (prompt_ko) MUST use: Korean Hangul ONLY (가-힣, U+AC00-U+D7A3)
+❌ Korean fields (prompt_ko) NEVER use: Chinese Hanzi (汉字, U+4E00-U+9FFF)
+❌ Korean fields (prompt_ko) NEVER use: Japanese (ひらがな, カタカナ)
+✅ English fields (prompt_en) MUST be in English only
+
+올바른 예시 (CORRECT): "전사가 검을 잡고 어두운 숲 가장자리에 서 있다"
+잘못된 예시 (WRONG): "戰士가 劍을 잡고" ← DO NOT DO THIS!
+잘못된 예시 (WRONG): "暗黑한 森林" ← DO NOT DO THIS!
+
+한국어는 한글(Hangul)로 작성하며, 한자(Hanzi/汉字)와는 완전히 다릅니다!
+한국어 필드(prompt_ko)에는 순수 한글만 사용하세요!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CRITICAL JSON OUTPUT REQUIREMENTS:
@@ -226,6 +247,7 @@ Create a clear narrative arc with proper pacing."""
                 system_prompt=self.STORY_BEATS_SYSTEM_PROMPT,
                 temperature=temperature,
                 max_tokens=2048,
+                korean_field_names=['story_summary_ko', 'description_ko']
             )
 
             num_beats = len(result.get('beats', []))
@@ -278,6 +300,7 @@ Ensure the character designs fit the visual theme and are highly specific for co
                 system_prompt=self.CHARACTER_SHEET_SYSTEM_PROMPT,
                 temperature=temperature,
                 max_tokens=2048,
+                korean_field_names=['name_ko', 'physical_ko', 'costume_ko', 'equipment_ko', 'personality_visual_ko']
             )
 
             num_chars = len(result.get('characters', []))
@@ -379,6 +402,7 @@ Create compelling, visually rich scenes that flow naturally like a single video.
                 system_prompt=self.SCENE_GENERATION_SYSTEM_PROMPT,
                 temperature=temperature,
                 max_tokens=4096,
+                korean_field_names=['prompt_ko', 'description']
             )
 
             # Append global style to each prompt
