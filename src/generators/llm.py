@@ -28,7 +28,7 @@ class LlamaClient:
     """Client for interacting with llama-server via HTTP API.
 
     이 클라이언트는 llama-server가 이미 실행 중이라고 가정합니다.
-    llama-server는 scripts/llama_server_manager.sh로 관리됩니다.
+    llama-server는 llama_server_manager.ps1로 관리됩니다.
     """
 
     def __init__(
@@ -93,9 +93,9 @@ class LlamaClient:
                 f"Failed to connect to llama-server at {self.server_url}\n"
                 f"Error: {e}\n\n"
                 f"llama-server가 실행 중인지 확인하세요:\n"
-                f"  ./scripts/llama_server_manager.sh status\n"
+                f"  powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action status\n"
                 f"실행되지 않았다면:\n"
-                f"  ./scripts/llama_server_manager.sh start"
+                f"  powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action start"
             )
             logger.error(error_msg)
             raise RuntimeError(error_msg)

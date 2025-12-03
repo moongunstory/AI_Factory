@@ -10,8 +10,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 # 프로젝트 경로 설정
-$PROJECT_DIR = Split-Path -Parent $PSScriptRoot
-$PID_FILE = Join-Path $PSScriptRoot ".llama_server.pid"
+$PROJECT_DIR = $PSScriptRoot
+$PID_FILE = Join-Path $PROJECT_DIR "output\logs\.llama_server.pid"
 $LOG_FILE = Join-Path $PROJECT_DIR "output\logs\llama_server.log"
 $MODEL_PATH = Join-Path $PROJECT_DIR "models\solar-10.7b\solar-10.7b-instruct-v1.0.Q6_K.gguf"
 $LLAMA_SERVER = Join-Path $PROJECT_DIR "engine\llama.cpp\build\bin\Release\llama-server.exe"

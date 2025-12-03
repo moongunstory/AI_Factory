@@ -10,14 +10,14 @@ class Config:
     # Project root directory
     ROOT_DIR = Path(__file__).parent.parent.parent
 
-    # Engine paths
+    # Engine paths (Windows GPU)
     ENGINE_DIR = ROOT_DIR / "engine"
-    LLAMA_CPP_PATH = ENGINE_DIR / "llama.cpp" / "build" / "bin" / "llama-cli"
-    LLAMA_SERVER_PATH = ENGINE_DIR / "llama.cpp" / "build" / "bin" / "llama-server"
+    LLAMA_CPP_PATH = ENGINE_DIR / "llama.cpp" / "build" / "bin" / "Release" / "llama-cli.exe"
+    LLAMA_SERVER_PATH = ENGINE_DIR / "llama.cpp" / "build" / "bin" / "Release" / "llama-server.exe"
 
     # Model paths
     MODEL_DIR = ROOT_DIR / "models"
-    LLAMA_MODEL_PATH = MODEL_DIR / "llama-3.1-8b"
+    LLAMA_MODEL_PATH = MODEL_DIR / "solar-10.7b"
 
     # Output paths
     OUTPUT_DIR = ROOT_DIR / "output"
