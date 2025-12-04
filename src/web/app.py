@@ -14,7 +14,6 @@ from src.pipeline.story_expander import StoryExpander
 from src.pipeline.prompt_generator import PromptGenerator
 from src.pipeline.advanced_scene_generator import AdvancedSceneGenerator
 from src.pipeline.visual_styles import VisualStyleDefinitions
-from src.pipeline.translator import Translator
 from src.pipeline.next_episode_suggester import NextEpisodeSuggester
 from src.data.universe_manager import UniverseManager
 from src.data.character_manager import CharacterManager
@@ -53,7 +52,6 @@ def get_components():
             'expander': StoryExpander(),
             'generator': PromptGenerator(),
             'advanced_generator': AdvancedSceneGenerator(),
-            'translator': Translator(),
             'suggester': NextEpisodeSuggester(),
             'universe_mgr': UniverseManager(data_root),
             'character_mgr': CharacterManager(data_root),
@@ -103,92 +101,68 @@ def serve_output(filename):
 
 @app.route('/api/expand-story', methods=['POST'])
 def expand_story():
-    """Expand a simple story idea into a full story.
-
-    Translation flow:
-    1. User Korean input → English (for LLM)
-    2. LLM English output → Korean (for UI display)
-    """
+    """Expand a simple story idea into a full story (English only)."""
     try:
         data = request.get_json()
-        simple_idea_ko = data.get('simple_idea', '').strip()
+        simple_idea = data.get('simple_idea', '').strip()
 
-        if not simple_idea_ko:
-            return jsonify({'error': '이야기 아이디어를 입력해주세요'}), 400
+        if not simple_idea:
+            return jsonify({'error': 'Please enter a story idea'}), 400
 
-        logger.info(f"User input (Korean): {simple_idea_ko[:50]}...")
+        logger.info(f"User input: {simple_idea[:50]}...")
 
         comp = get_components()
-        translator = comp['translator']
 
-        # Translate Korean input to English for LLM
-        simple_idea_en = translator.korean_to_english(simple_idea_ko)
-        logger.info(f"Translated to English: {simple_idea_en[:50]}...")
+        # Expand story (in English)
+        expanded = comp['expander'].expand(simple_idea)
+        logger.info(f"Expanded story: {expanded[:100]}...")
 
-        # Expand story in English
-        expanded_en = comp['expander'].expand(simple_idea_en)
-        logger.info(f"Expanded story (English): {expanded_en[:100]}...")
-
-        # Translate English story to Korean for UI display
-        expanded_ko = translator.english_to_korean(expanded_en)
-        logger.info(f"Translated to Korean for UI: {expanded_ko[:100]}...")
-
-        # Store both versions in session
-        session['expanded_story_en'] = expanded_en  # For further processing
-        session['expanded_story_ko'] = expanded_ko  # For UI display
-        session['simple_idea'] = simple_idea_ko
+        # Store in session
+        session['expanded_story'] = expanded
+        session['simple_idea'] = simple_idea
 
         return jsonify({
             'success': True,
-            'expanded_story': expanded_ko  # Return Korean for UI
+            'expanded_story': expanded
         })
 
     except Exception as e:
         logger.error(f"Story expansion failed: {e}")
-        return jsonify({'error': f'이야기 확장 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Story expansion failed: {str(e)}'}), 500
 
 
 @app.route('/api/generate-prompts', methods=['POST'])
 def generate_prompts():
-    """Generate scene prompts from expanded story using advanced scene generator.
-
-    Translation flow:
-    1. Use English story from session (expanded_story_en)
-    2. LLM generates English scene descriptions
-    3. Translate English descriptions to Korean for UI display
-    """
+    """Generate scene prompts from expanded story using advanced scene generator (English only)."""
     try:
         data = request.get_json()
-        expanded_story_ko = data.get('expanded_story', '').strip()  # Korean from UI
+        expanded_story = data.get('expanded_story', '').strip()
         theme = data.get('theme', 'cinematic_realism').strip()
 
-        if not expanded_story_ko:
-            return jsonify({'error': '확장된 이야기가 없습니다'}), 400
+        if not expanded_story:
+            return jsonify({'error': 'No expanded story provided'}), 400
 
-        # Use English version from session (generated in expand_story)
-        expanded_story_en = session.get('expanded_story_en', '')
-        if not expanded_story_en:
-            # If not in session, translate Korean to English
-            comp = get_components()
-            translator = comp['translator']
-            expanded_story_en = translator.korean_to_english(expanded_story_ko)
-            session['expanded_story_en'] = expanded_story_en
+        # Use story from session if available
+        if not expanded_story:
+            expanded_story = session.get('expanded_story', '')
+
+        if not expanded_story:
+            return jsonify({'error': 'No story available'}), 400
 
         logger.info(f"Generating advanced scene prompts (20-25 scenes) with theme: {theme}...")
-        logger.info(f"Using English story: {expanded_story_en[:100]}...")
+        logger.info(f"Using story: {expanded_story[:100]}...")
 
         comp = get_components()
         advanced_gen = comp['advanced_generator']
-        translator = comp['translator']
 
         # Step 1: Generate story beats (in English)
         logger.info("Step 1: Generating story beats...")
-        story_beats = advanced_gen.generate_story_beats(expanded_story_en, temperature=0.7)
+        story_beats = advanced_gen.generate_story_beats(expanded_story, temperature=0.7)
 
         # Step 2: Generate character sheets (in English)
         logger.info("Step 2: Generating character sheets...")
         character_sheets = advanced_gen.generate_character_sheet(
-            expanded_story_en,
+            expanded_story,
             story_beats,
             theme=theme,
             temperature=0.6
@@ -197,7 +171,7 @@ def generate_prompts():
         # Step 3: Generate 20-25 scenes (in English)
         logger.info("Step 3: Generating 20-25 scenes...")
         scenes_result = advanced_gen.generate_scenes(
-            expanded_story_en,
+            expanded_story,
             story_beats,
             character_sheets,
             theme=theme,
@@ -205,24 +179,12 @@ def generate_prompts():
             temperature=0.7
         )
 
-        # Format scenes for frontend with Korean translations
+        # Format scenes for frontend (English only)
         scenes = scenes_result.get('scenes', [])
         for scene in scenes:
-            # Translate English description to Korean for UI
-            description_en = scene.get('description', '')
-            if description_en:
-                scene['description_kr'] = translator.english_to_korean(description_en)
-            else:
-                scene['description_kr'] = ''
-
-            # Keep prompt_en as is (Stable Diffusion uses English)
-            # Add Korean translation for display purposes only
-            prompt_en = scene.get('prompt_en', '')
-            if prompt_en:
-                # For prompts, we can just copy or optionally translate
-                scene['prompt_kr'] = prompt_en  # SD prompts work better in English
-            else:
-                scene['prompt_kr'] = ''
+            # Keep all text in English
+            scene['description_kr'] = scene.get('description', '')
+            scene['prompt_kr'] = scene.get('prompt_en', '')
 
         # Prepare final prompts data
         prompts_data = {
@@ -250,32 +212,31 @@ def generate_prompts():
         logger.error(f"Prompt generation failed due to a runtime error: {e}")
         if "Failed to connect to llama-server" in str(e):
             error_message = (
-                "AI 서버(llama-server)가 실행되고 있지 않습니다. "
-                "이 창을 닫고, 프로젝트 폴더의 'run.bat' 파일을 실행하여 프로그램을 시작해주세요."
+                "AI server (llama-server) is not running. "
+                "Please close this window and run 'run.bat' to start the program."
             )
             return jsonify({'error': error_message}), 500
-        return jsonify({'error': f'프롬프트 생성 중 런타임 오류 발생: {str(e)}'}), 500
+        return jsonify({'error': f'Runtime error during prompt generation: {str(e)}'}), 500
     except Exception as e:
         logger.error(f"Prompt generation failed: {e}")
-        return jsonify({'error': f'프롬프트 생성 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Prompt generation failed: {str(e)}'}), 500
 
 
 @app.route('/api/regenerate-scene', methods=['POST'])
 def regenerate_scene():
-    """Regenerate a specific scene."""
+    """Regenerate a specific scene (English only)."""
     try:
         data = request.get_json()
         scene_number = data.get('scene_number')
         scene_description = data.get('scene_description', '')
 
         if scene_number is None:
-            return jsonify({'error': '장면 번호가 필요합니다'}), 400
+            return jsonify({'error': 'Scene number is required'}), 400
 
         logger.info(f"Regenerating scene {scene_number}...")
 
         comp = get_components()
         generator = comp['generator']
-        translator = comp['translator']
 
         # Regenerate this scene
         new_scene = generator.regenerate_scene(
@@ -283,12 +244,8 @@ def regenerate_scene():
             scene_description=scene_description
         )
 
-        # Translate
-        prompt_en = new_scene.get('prompt_en', '')
-        if prompt_en:
-            new_scene['prompt_kr'] = translator.translate(prompt_en)
-        else:
-            new_scene['prompt_kr'] = ''
+        # Keep English only
+        new_scene['prompt_kr'] = new_scene.get('prompt_en', '')
 
         return jsonify({
             'success': True,
@@ -297,25 +254,24 @@ def regenerate_scene():
 
     except Exception as e:
         logger.error(f"Scene regeneration failed: {e}")
-        return jsonify({'error': f'장면 재생성 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Scene regeneration failed: {str(e)}'}), 500
 
 
 @app.route('/api/regenerate-scenes', methods=['POST'])
 def regenerate_scenes():
-    """Regenerate multiple selected scenes using advanced scene generator."""
+    """Regenerate multiple selected scenes using advanced scene generator (English only)."""
     try:
         data = request.get_json()
         scenes_to_regenerate = data.get('scenes', [])
         theme = data.get('theme', session.get('theme', 'cinematic_realism'))
 
         if not scenes_to_regenerate:
-            return jsonify({'error': '재생성할 장면이 없습니다'}), 400
+            return jsonify({'error': 'No scenes to regenerate'}), 400
 
         logger.info(f"Regenerating {len(scenes_to_regenerate)} scenes with theme: {theme}...")
 
         comp = get_components()
         advanced_gen = comp['advanced_generator']
-        translator = comp['translator']
 
         # Get character sheets and global style from session
         character_sheets = session.get('character_sheets', {'characters': []})
@@ -336,15 +292,9 @@ def regenerate_scenes():
                 temperature=0.7
             )
 
-            # Add description_kr for frontend compatibility
+            # Keep English only
             new_scene['description_kr'] = new_scene.get('description', scene_description)
-
-            # Translate English prompt to Korean
-            prompt_en = new_scene.get('prompt_en', '')
-            if prompt_en:
-                new_scene['prompt_kr'] = translator.translate(prompt_en)
-            else:
-                new_scene['prompt_kr'] = ''
+            new_scene['prompt_kr'] = new_scene.get('prompt_en', '')
 
             regenerated_scenes.append(new_scene)
 
@@ -355,7 +305,7 @@ def regenerate_scenes():
 
     except Exception as e:
         logger.error(f"Scenes regeneration failed: {e}")
-        return jsonify({'error': f'장면 재생성 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Scenes regeneration failed: {str(e)}'}), 500
 
 
 # ============================================================================

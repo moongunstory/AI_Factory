@@ -18,7 +18,6 @@ class Config:
     # Model paths
     MODEL_DIR = ROOT_DIR / "models"
     LLAMA_MODEL_PATH = MODEL_DIR / "llm" / "Meta-Llama-3.1-8B-Instruct-Q5_K_M"
-    TRANSLATION_MODEL_PATH = MODEL_DIR / "translate" / "nllb-200-distilled-600M"
 
     # Output paths
     OUTPUT_DIR = ROOT_DIR / "output"
