@@ -75,35 +75,13 @@ function showSection(sectionId) {
 function persistProjectId(projectId) {
     if (!projectId) return;
     AppState.projectId = projectId;
-    document.cookie = `project_id=${projectId}; path=/; max-age=31536000`;
-    try {
-        localStorage.setItem(PROJECT_ID_KEY, projectId);
-    } catch (err) {
-        console.warn('Unable to persist project id to localStorage', err);
-    }
 }
 
 function loadPersistedProjectId() {
-    let storedId = null;
-    try {
-        storedId = localStorage.getItem(PROJECT_ID_KEY);
-    } catch (err) {
-        console.warn('Unable to read project id from localStorage', err);
-    }
-
-    if (storedId) {
-        persistProjectId(storedId);
-    }
-    return storedId;
+    return null;
 }
 
 function clearPersistedProjectId() {
-    try {
-        localStorage.removeItem(PROJECT_ID_KEY);
-    } catch (err) {
-        console.warn('Unable to clear stored project id', err);
-    }
-    document.cookie = 'project_id=; Max-Age=0; path=/';
     AppState.projectId = null;
 }
 
@@ -212,13 +190,7 @@ async function apiCall(url, method = 'GET', data = null) {
             }
         };
 
-        const projectId = AppState.projectId || (() => {
-            try {
-                return localStorage.getItem(PROJECT_ID_KEY);
-            } catch (err) {
-                return null;
-            }
-        })();
+        const projectId = AppState.projectId;
 
         let payload = data;
         if (method !== 'GET') {
@@ -244,6 +216,17 @@ async function apiCall(url, method = 'GET', data = null) {
         console.error('API Error:', error);
         alert(`오류: ${error.message}`);
         throw error;
+    }
+}
+
+async function deleteOutputFile(path) {
+    if (!path) return false;
+    try {
+        await apiCall('/api/delete-file', 'POST', { path });
+        return true;
+    } catch (error) {
+        alert(`파일 삭제 실패: ${error.message}`);
+        return false;
     }
 }
 
@@ -1183,6 +1166,7 @@ function displayImages() {
                         <input type="checkbox" class="image-checkbox" data-image="${index}">
                         재생성
                     </label>
+                    <button class="btn btn-danger btn-small image-delete" data-image="${index}">🗑️ 삭제</button>
                 </div>
                 <div class="image-preview">
                     <img src="/${image.image_path}" alt="Scene ${image.scene_number}"
@@ -1213,6 +1197,21 @@ function displayImages() {
         }
 
         container.appendChild(imageEl);
+    });
+
+    const deleteButtons = document.querySelectorAll('.image-delete');
+    deleteButtons.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const idx = Number(btn.dataset.image);
+            const target = AppState.generatedImages[idx];
+            if (!target?.image_path) return;
+            if (!confirm('이 이미지를 삭제할까요?')) return;
+            const deleted = await deleteOutputFile(target.image_path);
+            if (deleted) {
+                AppState.generatedImages[idx].image_path = null;
+                displayImages();
+            }
+        });
     });
 
     // Enable regenerate button when checkboxes are selected
@@ -1294,13 +1293,18 @@ async function startVideoGeneration() {
     `;
 
     try {
+        const durationInput = parseFloat(document.getElementById('video-length')?.value || '2.5');
+        const cameraInput = document.getElementById('video-camera')?.value || 'cinematic movement';
+        const fpsInput = parseInt(document.getElementById('video-fps')?.value || '24', 10) || 24;
+
         // Call video generation API
         const validImages = AppState.generatedImages.filter(img => img.image_path);
         const videoRequests = validImages.map(img => ({
             scene_number: img.scene_number,
             image_path: img.image_path,
-            video_prompt: AppState.scenes.find(s => s.scene_number === img.scene_number)?.video_prompt || 'cinematic movement',
-            duration: img.duration || 2.5
+            video_prompt: AppState.scenes.find(s => s.scene_number === img.scene_number)?.video_prompt || cameraInput,
+            duration: img.duration || durationInput,
+            fps: fpsInput
         }));
 
         // Update progress
@@ -1308,7 +1312,12 @@ async function startVideoGeneration() {
 
         const result = await apiCall('/api/generate-videos', 'POST', {
             videos: videoRequests,
-            mode: AppState.mode || 'oneshot'
+            mode: AppState.mode || 'oneshot',
+            options: {
+                duration: durationInput,
+                camera: cameraInput,
+                fps: fpsInput
+            }
         });
 
         if (result.project_id) {
@@ -1322,7 +1331,7 @@ async function startVideoGeneration() {
         document.getElementById('proceed-to-assembly-btn').classList.remove('hidden');
 
     } catch (error) {
-        alert(`영상 생성 실패: ${error.message}\n\nWAN2.2 모델이 설치되어 있는지 확인하세요.`);
+        alert(`영상 생성 실패: ${error.message}\n\nComfyUI 서버와 WAN2.2 워크플로 템플릿을 확인하세요.`);
         document.getElementById('video-progress-status').textContent = '영상 생성 실패';
     }
 }
@@ -1348,6 +1357,7 @@ function displayVideos() {
                 <div class="video-header">
                     <div class="video-title">장면 ${video.scene_number}</div>
                     <span class="video-duration">${video.duration}s</span>
+                    <button class="btn btn-danger btn-small video-delete" data-video="${index}">🗑️ 삭제</button>
                 </div>
                 <div class="video-preview">
                     <video src="/${video.video_path}" controls></video>
@@ -1369,6 +1379,21 @@ function displayVideos() {
         }
 
         container.appendChild(videoEl);
+    });
+
+    const deleteButtons = document.querySelectorAll('.video-delete');
+    deleteButtons.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const idx = Number(btn.dataset.video);
+            const target = AppState.generatedVideos[idx];
+            if (!target?.video_path) return;
+            if (!confirm('이 영상을 삭제할까요?')) return;
+            const deleted = await deleteOutputFile(target.video_path);
+            if (deleted) {
+                AppState.generatedVideos[idx].video_path = null;
+                displayVideos();
+            }
+        });
     });
 }
 

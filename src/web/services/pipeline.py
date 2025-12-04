@@ -3,7 +3,7 @@
 This module orchestrates the complete workflow:
 1. Story & scene generation (llama-server)
 2. Image generation per scene (ComfyUI + SDXL)
-3. Video generation per scene (WAN2.2 I2V)
+3. Video generation per scene (ComfyUI WAN2.2 workflow)
 4. Final video assembly (ffmpeg concat)
 """
 import json
@@ -16,7 +16,7 @@ from datetime import datetime
 
 from .llama_client import LlamaStoryClient
 from .comfy_client import ComfyUIClient
-from .wan2_client import WAN2Client, generate_static_video_ffmpeg
+from .video_client import ComfyUIVideoClient
 from src.common.logger import setup_logger
 from src.common.config import Config
 
@@ -225,12 +225,7 @@ def generate_short(
         # ====================================================================
         update_state(PipelineStatus.GENERATING_VIDEOS, 50, "Generating videos...")
 
-        wan2_client = WAN2Client()
-        wan2_available = wan2_client.is_available()
-
-        if not wan2_available:
-            logger.warning("WAN2.2 not available, using ffmpeg fallback for video generation")
-
+        video_client = ComfyUIVideoClient()
         scene_video_paths = []
 
         for i, scene_info in enumerate(state["scenes"], 1):
@@ -250,26 +245,13 @@ def generate_short(
             )
 
             try:
-                if wan2_available:
-                    # Use WAN2.2 for I2V
-                    wan2_client.generate_scene_video(
-                        image_path=image_path,
-                        prompt=scene_info["video_prompt"],
-                        out_path=video_path,
-                        duration_sec=scene_info["duration_sec"],
-                        fps=24,
-                        motion_strength=0.7,
-                        num_inference_steps=50,
-                        guidance_scale=7.5,
-                    )
-                else:
-                    # Fallback to ffmpeg static video
-                    generate_static_video_ffmpeg(
-                        image_path=image_path,
-                        out_path=video_path,
-                        duration_sec=scene_info["duration_sec"],
-                        fps=24,
-                    )
+                video_client.generate_video(
+                    image_path=image_path,
+                    output_path=video_path,
+                    duration_sec=scene_info["duration_sec"],
+                    fps=24,
+                    camera_prompt=scene_info["video_prompt"],
+                )
 
                 scene_info["video_path"] = str(video_path.relative_to(project_root))
                 scene_video_paths.append(video_path)
@@ -428,7 +410,6 @@ def check_engines_health() -> Dict[str, bool]:
         {
             "llama_server": bool,
             "comfyui": bool,
-            "wan22": bool,
             "overall": bool
         }
     """
@@ -437,7 +418,6 @@ def check_engines_health() -> Dict[str, bool]:
     health = {
         "llama_server": False,
         "comfyui": False,
-        "wan22": False,
         "overall": False,
     }
 
@@ -452,12 +432,6 @@ def check_engines_health() -> Dict[str, bool]:
         health["comfyui"] = comfy_client.is_healthy()
     except Exception as e:
         logger.warning(f"ComfyUI health check failed: {e}")
-
-    try:
-        wan2_client = WAN2Client()
-        health["wan22"] = wan2_client.is_available()
-    except Exception as e:
-        logger.warning(f"WAN2.2 health check failed: {e}")
 
     # Overall health: at minimum llama-server and ComfyUI must be healthy
     health["overall"] = health["llama_server"] and health["comfyui"]
