@@ -99,8 +99,11 @@ class ComfyUIManager:
             str(self.comfyui_main),
             "--listen", self.server_host,
             "--port", str(self.server_port),
-            "--lowvram",  # Enable low VRAM mode
-            "--normalvram",  # Use normal VRAM mode (disable high VRAM mode)
+
+            # VRAM 안정화 옵션
+            "--lowvram",                 # VRAM 절약 모드
+            "--cpu-vae",                 # VAE를 CPU로 분리 → VRAM 폭발 방지
+            "--disable-pinned-memory",   # 안정성 향상
         ]
 
         logger.info("Starting ComfyUI server...")
