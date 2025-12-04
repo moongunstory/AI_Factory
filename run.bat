@@ -69,19 +69,14 @@ echo [OK] Cleanup complete
 echo.
 
 REM ==========================================
-REM 3. Start llama-server
+REM 3. Start All Backend Services
 REM ==========================================
 
-echo [3/4] Starting llama-server with GPU support...
+echo [3/4] Starting backend services (llama-server + ComfyUI)...
 echo.
 
-REM Check if already running
-python "%PY_MANAGER%" status >nul 2>&1
-if errorlevel 1 (
-    python "%PY_MANAGER%" start
-) else (
-    echo [OK] llama-server already running
-)
+REM Start all services (llama-server and ComfyUI)
+python "%PY_MANAGER%" start all
 echo.
 
 REM ==========================================
@@ -95,8 +90,10 @@ echo  AI Short Factory Running
 echo ==========================================
 echo  Web UI: http://localhost:5000
 echo  llama-server: http://localhost:8080
+echo  ComfyUI: http://localhost:8188
 echo.
 echo  Press Ctrl+C to stop the server
+echo  (All backend services will continue running)
 echo ==========================================
 echo.
 
@@ -109,8 +106,11 @@ python "%FLASK_APP%"
 REM If Flask exits, show message
 echo.
 echo [INFO] Flask has stopped.
-echo [INFO] llama-server is still running in the background.
-echo [INFO] To stop llama-server, run:
-echo        python src\manage_server.py stop
+echo [INFO] Backend services (llama-server, ComfyUI) are still running.
+echo.
+echo [옵션] 백엔드 서비스 관리:
+echo   - 모두 종료: python src\manage_server.py stop all
+echo   - 상태 확인: python src\manage_server.py status
+echo   - 재시작: python src\manage_server.py restart all
 echo.
 pause
