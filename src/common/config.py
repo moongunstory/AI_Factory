@@ -18,6 +18,8 @@ class Config:
     # Model paths
     MODEL_DIR = ROOT_DIR / "models"
     LLAMA_MODEL_PATH = MODEL_DIR / "llm" / "Meta-Llama-3.1-8B-Instruct-Q5_K_M"
+    SDXL_BASE_MODEL = "sd_xl_base_1.0.safetensors"
+    SDXL_REFINER_MODEL = "sd_xl_refiner_1.0.safetensors"
 
     # Output paths
     OUTPUT_DIR = ROOT_DIR / "output"
@@ -25,6 +27,11 @@ class Config:
     IMAGES_DIR = OUTPUT_DIR / "images"
     LOGS_DIR = OUTPUT_DIR / "logs"
     PROMPTS_DIR = OUTPUT_DIR / "prompts"
+
+    # ComfyUI configuration
+    COMFYUI_HOST = os.getenv("COMFYUI_HOST", "127.0.0.1")
+    COMFYUI_PORT = int(os.getenv("COMFYUI_PORT", "8188"))
+    COMFYUI_URL = f"http://{COMFYUI_HOST}:{COMFYUI_PORT}"
 
     # llama-server configuration
     LLAMA_SERVER_HOST = os.getenv("LLAMA_SERVER_HOST", "127.0.0.1")

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Short Factory - Series Studio</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/image-styles.css') }}">
 </head>
 <body>
     <div class="container">
@@ -335,6 +336,30 @@
                 재생성할 장면을 선택하려면 체크박스를 체크하세요.
             </div>
 
+            <hr>
+            <div class="button-group">
+                <button id="generate-images-btn" class="btn btn-primary">🎨 Step 4: 이미지 생성하기</button>
+                <div id="image-generation-loading" class="loading hidden">이미지를 생성하는 중... (ComfyUI + SDXL)</div>
+            </div>
+
+            <!-- Step 4: Generated Images -->
+            <div id="step-4-images" class="hidden">
+                <hr>
+                <h2>🖼️ Step 4: 생성된 이미지</h2>
+                <div id="images-summary" class="prompts-summary"></div>
+                <div id="images-container" class="images-grid"></div>
+
+                <hr>
+                <div id="image-regenerate-controls">
+                    <button id="regenerate-images-btn" class="btn btn-secondary">🔄 선택한 이미지 재생성</button>
+                    <div id="image-regenerate-loading" class="loading hidden">이미지를 재생성하는 중...</div>
+                </div>
+                <div id="image-regenerate-info" class="info-message">
+                    재생성할 이미지를 선택하려면 체크박스를 체크하세요.
+                </div>
+            </div>
+
+            <hr>
             <div class="button-group">
                 <button id="prompts-back-btn" class="btn btn-secondary">← 뒤로 (스토리 수정)</button>
                 <button id="save-and-finish-btn" class="btn btn-primary">💾 저장 및 완료</button>
