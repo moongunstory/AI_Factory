@@ -33,6 +33,15 @@ const AppState = {
     // Project ID for save/load
     projectId: null,
     projectPath: null,
+    projectName: '',
+    autoSaveEnabled: false,
+    autoSaveTimer: null,
+
+    // Final assembly
+    finalVideoPath: null,
+    finalVideoDuration: null,
+    finalVideoResolution: null,
+    lastSavedAt: null,
 
     // Suggestions
     suggestions: []
@@ -185,6 +194,327 @@ async function apiCall(url, method = 'GET', data = null) {
         alert(`오류: ${error.message}`);
         throw error;
     }
+}
+
+// ============================================================================
+// Project Save/Load
+// ============================================================================
+
+let saveInFlight = false;
+
+function updateSaveStatus(message, status = 'info') {
+    const statusEl = document.getElementById('project-save-status');
+    if (!statusEl) return;
+
+    statusEl.textContent = message;
+    statusEl.classList.remove('success', 'error');
+
+    if (status === 'success') {
+        statusEl.classList.add('success');
+    } else if (status === 'error') {
+        statusEl.classList.add('error');
+    }
+}
+
+function hasDataToSave() {
+    return Boolean(
+        AppState.storyIdea ||
+        AppState.expandedStory ||
+        (AppState.scenes && AppState.scenes.length > 0) ||
+        (AppState.generatedImages && AppState.generatedImages.length > 0) ||
+        (AppState.generatedVideos && AppState.generatedVideos.length > 0) ||
+        AppState.finalVideoPath
+    );
+}
+
+async function saveCurrentProject(silent = false) {
+    if (saveInFlight) return;
+
+    const projectNameInput = document.getElementById('project-name-input');
+    const projectName = projectNameInput?.value.trim() || 'Untitled';
+
+    AppState.projectName = projectName;
+
+    if (!hasDataToSave()) {
+        updateSaveStatus('저장할 데이터가 없습니다. 작업을 진행해 주세요.', 'error');
+        if (!silent) alert('저장할 데이터가 없습니다. 먼저 스토리나 이미지를 생성해 주세요.');
+        return;
+    }
+
+    saveInFlight = true;
+    updateSaveStatus('저장 중...');
+
+    try {
+        const result = await apiCall('/api/save-project', 'POST', {
+            project_name: projectName
+        });
+
+        AppState.projectId = result.project_id;
+        AppState.projectPath = result.project_path;
+        AppState.lastSavedAt = new Date();
+
+        const timeText = AppState.lastSavedAt.toLocaleTimeString('ko-KR', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        updateSaveStatus(`저장됨 (${timeText})`, 'success');
+
+        if (!silent) {
+            alert('프로젝트가 저장되었습니다.');
+        }
+    } catch (error) {
+        updateSaveStatus('저장 실패. 다시 시도해 주세요.', 'error');
+        if (!silent) {
+            alert(`프로젝트 저장 실패: ${error.message}`);
+        }
+    } finally {
+        saveInFlight = false;
+    }
+}
+
+function startAutoSaveLoop() {
+    AppState.autoSaveEnabled = true;
+
+    if (AppState.autoSaveTimer) {
+        clearInterval(AppState.autoSaveTimer);
+    }
+
+    updateSaveStatus('자동 저장 대기 중...');
+
+    AppState.autoSaveTimer = setInterval(() => {
+        if (!AppState.autoSaveEnabled) return;
+        if (!hasDataToSave()) return;
+
+        saveCurrentProject(true);
+    }, 60 * 1000);
+}
+
+function stopAutoSaveLoop() {
+    AppState.autoSaveEnabled = false;
+
+    if (AppState.autoSaveTimer) {
+        clearInterval(AppState.autoSaveTimer);
+        AppState.autoSaveTimer = null;
+    }
+
+    updateSaveStatus('자동 저장이 꺼져 있습니다. 필요 시 직접 저장해 주세요.');
+}
+
+async function fetchProjectList() {
+    const loadingEl = document.getElementById('load-project-loading');
+    const listEl = document.getElementById('project-list');
+    const emptyEl = document.getElementById('no-project-message');
+
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    listEl?.classList.add('hidden');
+    emptyEl?.classList.add('hidden');
+
+    try {
+        const result = await apiCall('/api/list-projects');
+        const projects = result.projects || [];
+
+        if (projects.length === 0) {
+            emptyEl?.classList.remove('hidden');
+            listEl?.classList.add('hidden');
+            return;
+        }
+
+        renderProjectList(projects);
+    } catch (error) {
+        console.error('Failed to fetch project list:', error);
+    } finally {
+        if (loadingEl) loadingEl.classList.add('hidden');
+    }
+}
+
+function renderProjectList(projects) {
+    const listEl = document.getElementById('project-list');
+    const confirmBtn = document.getElementById('confirm-load-btn');
+
+    if (!listEl) return;
+
+    listEl.innerHTML = '';
+
+    projects.forEach(project => {
+        const card = document.createElement('div');
+        card.className = 'project-card';
+        card.dataset.projectId = project.project_id;
+
+        const created = project.created_at ? project.created_at : '시간 정보 없음';
+
+        card.innerHTML = `
+            <div class="title">${project.project_name || project.project_id}</div>
+            <div class="meta">생성: ${created} | 모드: ${project.mode || 'N/A'}</div>
+            <div class="tag">${project.theme || '기본 테마'}</div>
+        `;
+
+        card.addEventListener('click', () => {
+            document.querySelectorAll('.project-card').forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.dataset.selectedProject = project.project_id;
+            }
+        });
+
+        listEl.appendChild(card);
+    });
+
+    listEl.classList.remove('hidden');
+}
+
+function openLoadModal() {
+    const modal = document.getElementById('load-project-modal');
+    if (!modal) return;
+
+    modal.classList.remove('hidden');
+    fetchProjectList();
+}
+
+function closeLoadModal() {
+    const modal = document.getElementById('load-project-modal');
+    const confirmBtn = document.getElementById('confirm-load-btn');
+
+    if (modal) modal.classList.add('hidden');
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        delete confirmBtn.dataset.selectedProject;
+    }
+}
+
+async function handleProjectLoad() {
+    const confirmBtn = document.getElementById('confirm-load-btn');
+    const projectId = confirmBtn?.dataset.selectedProject;
+
+    if (!projectId) return;
+
+    confirmBtn.disabled = true;
+    updateSaveStatus('프로젝트를 불러오는 중...');
+
+    try {
+        const result = await apiCall('/api/load-project', 'POST', { project_id: projectId });
+        applyLoadedProject(result.project_data);
+        closeLoadModal();
+        alert('프로젝트를 불러왔습니다.');
+    } catch (error) {
+        alert(`프로젝트 불러오기 실패: ${error.message}`);
+    } finally {
+        confirmBtn.disabled = false;
+    }
+}
+
+function applyLoadedProject(projectData) {
+    if (!projectData) return;
+
+    AppState.projectId = projectData.project_id;
+    AppState.projectPath = projectData.project_path;
+    AppState.projectName = projectData.project_name || '';
+
+    const nameInput = document.getElementById('project-name-input');
+    if (nameInput) nameInput.value = AppState.projectName;
+
+    AppState.mode = projectData.mode || AppState.mode;
+    AppState.theme = projectData.theme || AppState.theme;
+    AppState.storyIdea = projectData.simple_idea || '';
+    AppState.expandedStory = projectData.expanded_story || '';
+    AppState.characterSheets = projectData.character_sheets || { characters: [] };
+    AppState.scenes = (projectData.prompts_data && projectData.prompts_data.scenes) || [];
+    AppState.generatedImages = projectData.generated_images || [];
+    AppState.generatedVideos = projectData.generated_videos || [];
+    AppState.finalVideoPath = projectData.final_video_path || null;
+    AppState.finalVideoDuration = projectData.duration || projectData.total_duration || null;
+    AppState.finalVideoResolution = projectData.resolution || null;
+
+    const storyInput = document.getElementById('story-idea-input');
+    if (storyInput) storyInput.value = AppState.storyIdea || '';
+
+    const themeSelect = document.getElementById('theme-select');
+    if (themeSelect && AppState.theme) {
+        themeSelect.value = AppState.theme;
+    }
+
+    // Highlight mode selection
+    document.querySelectorAll('.mode-card').forEach(card => card.classList.remove('selected'));
+    if (AppState.mode === 'series') {
+        document.getElementById('mode-series')?.classList.add('selected');
+    } else if (AppState.mode === 'oneshot') {
+        document.getElementById('mode-oneshot')?.classList.add('selected');
+    }
+
+    let step = 1;
+
+    if (AppState.expandedStory) {
+        displayExpandedStory();
+        step = 2;
+        showSection('step-2-story-expanded');
+    }
+
+    if (AppState.scenes && AppState.scenes.length > 0) {
+        displayScenes();
+        step = 3;
+        showSection('step-3-prompts');
+    }
+
+    if (AppState.generatedImages && AppState.generatedImages.length > 0) {
+        displayImages();
+        step = 4;
+    }
+
+    if (AppState.generatedVideos && AppState.generatedVideos.length > 0) {
+        displayVideos();
+        document.getElementById('proceed-to-assembly-btn')?.classList.remove('hidden');
+        showSection('step-4-video-generation');
+        step = 4;
+    }
+
+    if (AppState.finalVideoPath) {
+        displayFinalVideoResult();
+        showSection('step-5-final-assembly');
+        step = 5;
+    }
+
+    AppState.currentStep = step;
+    updateProgressBar(step);
+    updateSaveStatus('불러온 프로젝트가 적용되었습니다.', 'success');
+}
+
+function initProjectControls() {
+    const saveBtn = document.getElementById('save-project-btn');
+    const loadBtn = document.getElementById('load-project-btn');
+    const closeModalBtn = document.getElementById('close-load-modal');
+    const refreshBtn = document.getElementById('refresh-project-list-btn');
+    const confirmLoadBtn = document.getElementById('confirm-load-btn');
+    const autosaveToggle = document.getElementById('autosave-toggle');
+    const projectNameInput = document.getElementById('project-name-input');
+    const modal = document.getElementById('load-project-modal');
+
+    saveBtn?.addEventListener('click', () => saveCurrentProject());
+    loadBtn?.addEventListener('click', () => openLoadModal());
+    closeModalBtn?.addEventListener('click', () => closeLoadModal());
+    refreshBtn?.addEventListener('click', () => fetchProjectList());
+    confirmLoadBtn?.addEventListener('click', () => handleProjectLoad());
+
+    autosaveToggle?.addEventListener('change', (event) => {
+        if (event.target.checked) {
+            startAutoSaveLoop();
+        } else {
+            stopAutoSaveLoop();
+        }
+    });
+
+    projectNameInput?.addEventListener('input', (event) => {
+        AppState.projectName = event.target.value;
+    });
+
+    modal?.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            closeLoadModal();
+        }
+    });
+
+    updateSaveStatus('아직 저장되지 않았습니다');
 }
 
 // ============================================================================
@@ -1069,6 +1399,24 @@ function initFinalAssembly() {
     });
 }
 
+function displayFinalVideoResult() {
+    if (!AppState.finalVideoPath) return;
+
+    const finalContainer = document.getElementById('final-video-result');
+    finalContainer?.classList.remove('hidden');
+
+    document.getElementById('final-video-player').src = `/${AppState.finalVideoPath}`;
+    document.getElementById('final-video-path').textContent = AppState.finalVideoPath;
+
+    if (AppState.finalVideoDuration) {
+        document.getElementById('final-video-duration').textContent = `${AppState.finalVideoDuration}s`;
+    }
+
+    if (AppState.finalVideoResolution) {
+        document.getElementById('final-video-resolution').textContent = AppState.finalVideoResolution;
+    }
+}
+
 async function startFinalAssembly() {
     showLoading('assembly-loading');
     document.getElementById('assembly-progress').classList.remove('hidden');
@@ -1100,6 +1448,12 @@ async function startFinalAssembly() {
         document.getElementById('final-video-duration').textContent = `${result.duration}s`;
         document.getElementById('final-video-resolution').textContent = result.resolution || '768x1365';
 
+        AppState.finalVideoPath = result.final_video_path;
+        AppState.finalVideoDuration = result.duration;
+        AppState.finalVideoResolution = result.resolution || '768x1365';
+        AppState.currentStep = 5;
+        updateProgressBar(5);
+
         // Update progress
         document.getElementById('assembly-progress-status').textContent = '완료!';
         document.getElementById('assembly-progress-bar').style.width = '100%';
@@ -1120,6 +1474,7 @@ async function startFinalAssembly() {
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     // Initialize all sections
+    initProjectControls();
     initModeSelection();
     initSeriesSetup();
     initStoryInput();

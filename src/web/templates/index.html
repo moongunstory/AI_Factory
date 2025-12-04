@@ -14,6 +14,22 @@
             <p class="subtitle">원샷부터 시리즈까지 - AI 기반 숏폼 제작 도구</p>
         </header>
 
+        <section class="project-toolbar" aria-label="project controls">
+            <div class="project-meta">
+                <label class="project-name-label" for="project-name-input">프로젝트 이름</label>
+                <input id="project-name-input" class="form-input project-name-input" type="text"
+                       placeholder="예: 시즌1 - 에피소드3" aria-label="프로젝트 이름">
+                <div id="project-save-status" class="project-save-status">아직 저장되지 않았습니다</div>
+            </div>
+            <div class="project-actions">
+                <label class="autosave-toggle" for="autosave-toggle">
+                    <input id="autosave-toggle" type="checkbox"> 자동 저장 (1분 간격)
+                </label>
+                <button id="load-project-btn" class="btn btn-secondary" type="button">📂 이어서 하기</button>
+                <button id="save-project-btn" class="btn btn-primary" type="button">💾 지금 저장</button>
+            </div>
+        </section>
+
         <!-- Tab Navigation -->
         <nav class="tab-row" aria-label="mode tabs">
             <button class="tab-btn active" data-tab="cinematic-story">
@@ -540,6 +556,24 @@
         <footer>
             <p>AI Short Factory - Powered by Local LLM (llama.cpp) | Series Studio v2.0</p>
         </footer>
+    </div>
+
+    <div id="load-project-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="load-project-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="load-project-title">📂 저장된 프로젝트 불러오기</h3>
+                <button id="close-load-modal" class="modal-close" aria-label="닫기">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="load-project-loading" class="loading">목록을 불러오는 중...</div>
+                <div id="project-list" class="project-list hidden"></div>
+                <div id="no-project-message" class="info-message hidden">저장된 프로젝트가 없습니다.</div>
+            </div>
+            <div class="modal-actions">
+                <button id="refresh-project-list-btn" class="btn btn-secondary" type="button">🔄 새로고침</button>
+                <button id="confirm-load-btn" class="btn btn-primary" type="button" disabled>불러오기</button>
+            </div>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
