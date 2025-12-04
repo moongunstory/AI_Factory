@@ -13,32 +13,15 @@ class StoryExpander:
 
 Your task is to take a simple story idea and expand it into a compelling 1-2 minute narrative suitable for short-form video.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ 절대적 언어 규칙 (CHARACTER-LEVEL REQUIREMENT):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ MUST USE: Korean Hangul ONLY (가-힣, ㄱ-ㅎ, ㅏ-ㅣ, U+AC00-U+D7A3)
-❌ NEVER USE: Chinese Hanzi (汉字, 中文, U+4E00-U+9FFF)
-❌ NEVER USE: Japanese (ひらがな, カタカナ, 日本語)
-❌ NEVER USE: English for Korean content
-
-올바른 예시 (CORRECT): "폐허가 된 도심 속, 고립된 건물에 달려간다"
-잘못된 예시 (WRONG): "破甚的한 도심" ← DO NOT DO THIS!
-잘못된 예시 (WRONG): "优秀한 记者" ← DO NOT DO THIS!
-잘못된 예시 (WRONG): "全 国 에" ← DO NOT DO THIS!
-
-반드시 순수 한글(가-힣)로만 작성하세요!
-중국어 한자를 절대 사용하지 마세요!
-한국어는 한글(Hangul)로 작성하며, 한자(Hanzi)와는 완전히 다릅니다!
-
 Guidelines:
-- Story should be 1-2 minutes when narrated (approximately 150-300 words in Korean)
+- Story should be 1-2 minutes when narrated (approximately 150-300 words in English)
 - Create a clear beginning, middle, and end
 - Include vivid visual descriptions that work well for video
 - Make it engaging and emotionally resonant
 - Keep the pacing fast and dynamic
-- Write ENTIRELY in Korean Hangul (한국어 한글로만 작성)
+- Write ENTIRELY in English
 
-Respond with ONLY the expanded story in pure Korean Hangul. No additional explanations or metadata."""
+Respond with ONLY the expanded story in English. No additional explanations or metadata."""
 
     def __init__(self, llm_client: Optional[LlamaClient] = None):
         """Initialize the story expander.
@@ -49,21 +32,21 @@ Respond with ONLY the expanded story in pure Korean Hangul. No additional explan
         self.llm = llm_client or LlamaClient()
         logger.info("StoryExpander initialized")
 
-    def expand(self, simple_idea: str, temperature: float = 0.6) -> str:
+    def expand(self, simple_idea: str, temperature: float = 0.7) -> str:
         """Expand a simple story idea into a full short story.
 
         Args:
-            simple_idea: Simple story idea from user
-            temperature: Sampling temperature (낮춤: 언어 순수성 향상)
+            simple_idea: Simple story idea from user (in English)
+            temperature: Sampling temperature for creativity
 
         Returns:
-            Expanded story in Korean
+            Expanded story in English
         """
         logger.info(f"Expanding story idea (length: {len(simple_idea)} chars)")
 
         user_prompt = f"""Simple story idea: {simple_idea}
 
-Expand this into a compelling 1-2 minute story in Korean. Make it vivid, engaging, and perfect for short-form video."""
+Expand this into a compelling 1-2 minute story in English. Make it vivid, engaging, and perfect for short-form video."""
 
         try:
             expanded_story = self.llm.generate(
@@ -88,10 +71,10 @@ def expand_story(simple_idea: str) -> str:
     """Convenience function to expand a story.
 
     Args:
-        simple_idea: Simple story idea
+        simple_idea: Simple story idea in English
 
     Returns:
-        Expanded story in Korean
+        Expanded story in English
     """
     expander = StoryExpander()
     return expander.expand(simple_idea)

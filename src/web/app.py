@@ -103,26 +103,44 @@ def serve_output(filename):
 
 @app.route('/api/expand-story', methods=['POST'])
 def expand_story():
-    """Expand a simple story idea into a full story."""
+    """Expand a simple story idea into a full story.
+
+    Translation flow:
+    1. User Korean input → English (for LLM)
+    2. LLM English output → Korean (for UI display)
+    """
     try:
         data = request.get_json()
-        simple_idea = data.get('simple_idea', '').strip()
+        simple_idea_ko = data.get('simple_idea', '').strip()
 
-        if not simple_idea:
+        if not simple_idea_ko:
             return jsonify({'error': '이야기 아이디어를 입력해주세요'}), 400
 
-        logger.info(f"Expanding story: {simple_idea[:50]}...")
+        logger.info(f"User input (Korean): {simple_idea_ko[:50]}...")
 
         comp = get_components()
-        expanded = comp['expander'].expand(simple_idea)
+        translator = comp['translator']
 
-        # Store in session
-        session['expanded_story'] = expanded
-        session['simple_idea'] = simple_idea
+        # Translate Korean input to English for LLM
+        simple_idea_en = translator.korean_to_english(simple_idea_ko)
+        logger.info(f"Translated to English: {simple_idea_en[:50]}...")
+
+        # Expand story in English
+        expanded_en = comp['expander'].expand(simple_idea_en)
+        logger.info(f"Expanded story (English): {expanded_en[:100]}...")
+
+        # Translate English story to Korean for UI display
+        expanded_ko = translator.english_to_korean(expanded_en)
+        logger.info(f"Translated to Korean for UI: {expanded_ko[:100]}...")
+
+        # Store both versions in session
+        session['expanded_story_en'] = expanded_en  # For further processing
+        session['expanded_story_ko'] = expanded_ko  # For UI display
+        session['simple_idea'] = simple_idea_ko
 
         return jsonify({
             'success': True,
-            'expanded_story': expanded
+            'expanded_story': expanded_ko  # Return Korean for UI
         })
 
     except Exception as e:
@@ -132,38 +150,54 @@ def expand_story():
 
 @app.route('/api/generate-prompts', methods=['POST'])
 def generate_prompts():
-    """Generate scene prompts from expanded story using advanced scene generator."""
+    """Generate scene prompts from expanded story using advanced scene generator.
+
+    Translation flow:
+    1. Use English story from session (expanded_story_en)
+    2. LLM generates English scene descriptions
+    3. Translate English descriptions to Korean for UI display
+    """
     try:
         data = request.get_json()
-        expanded_story = data.get('expanded_story', '').strip()
+        expanded_story_ko = data.get('expanded_story', '').strip()  # Korean from UI
         theme = data.get('theme', 'cinematic_realism').strip()
 
-        if not expanded_story:
+        if not expanded_story_ko:
             return jsonify({'error': '확장된 이야기가 없습니다'}), 400
 
+        # Use English version from session (generated in expand_story)
+        expanded_story_en = session.get('expanded_story_en', '')
+        if not expanded_story_en:
+            # If not in session, translate Korean to English
+            comp = get_components()
+            translator = comp['translator']
+            expanded_story_en = translator.korean_to_english(expanded_story_ko)
+            session['expanded_story_en'] = expanded_story_en
+
         logger.info(f"Generating advanced scene prompts (20-25 scenes) with theme: {theme}...")
+        logger.info(f"Using English story: {expanded_story_en[:100]}...")
 
         comp = get_components()
         advanced_gen = comp['advanced_generator']
         translator = comp['translator']
 
-        # Step 1: Generate story beats
+        # Step 1: Generate story beats (in English)
         logger.info("Step 1: Generating story beats...")
-        story_beats = advanced_gen.generate_story_beats(expanded_story, temperature=0.7)
+        story_beats = advanced_gen.generate_story_beats(expanded_story_en, temperature=0.7)
 
-        # Step 2: Generate character sheets
+        # Step 2: Generate character sheets (in English)
         logger.info("Step 2: Generating character sheets...")
         character_sheets = advanced_gen.generate_character_sheet(
-            expanded_story,
+            expanded_story_en,
             story_beats,
             theme=theme,
             temperature=0.6
         )
 
-        # Step 3: Generate 20-25 scenes
+        # Step 3: Generate 20-25 scenes (in English)
         logger.info("Step 3: Generating 20-25 scenes...")
         scenes_result = advanced_gen.generate_scenes(
-            expanded_story,
+            expanded_story_en,
             story_beats,
             character_sheets,
             theme=theme,
@@ -171,16 +205,22 @@ def generate_prompts():
             temperature=0.7
         )
 
-        # Format scenes for frontend compatibility
+        # Format scenes for frontend with Korean translations
         scenes = scenes_result.get('scenes', [])
         for scene in scenes:
-            # Add description_kr (Korean description) for frontend compatibility
-            scene['description_kr'] = scene.get('description', '')
+            # Translate English description to Korean for UI
+            description_en = scene.get('description', '')
+            if description_en:
+                scene['description_kr'] = translator.english_to_korean(description_en)
+            else:
+                scene['description_kr'] = ''
 
-            # Translate English prompt to Korean
+            # Keep prompt_en as is (Stable Diffusion uses English)
+            # Add Korean translation for display purposes only
             prompt_en = scene.get('prompt_en', '')
             if prompt_en:
-                scene['prompt_kr'] = translator.translate(prompt_en)
+                # For prompts, we can just copy or optionally translate
+                scene['prompt_kr'] = prompt_en  # SD prompts work better in English
             else:
                 scene['prompt_kr'] = ''
 

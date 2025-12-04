@@ -12,27 +12,12 @@ class PromptGenerator:
 
     SYSTEM_PROMPT = """You are an expert AI prompt engineer specializing in Stable Diffusion image generation prompts.
 
-Your task is to analyze a Korean story and break it down into visual scenes, creating detailed Stable Diffusion prompts for each scene.
+Your task is to analyze an English story and break it down into visual scenes, creating detailed Stable Diffusion prompts for each scene.
 
 Stable Diffusion prompt format:
 - Use comma-separated tags and descriptions
 - Include: subject, action, setting, lighting, style, quality tags
 - Example: "a lonely robot in abandoned space station, dark corridor, blue emergency lights, cinematic lighting, detailed mechanical parts, sci-fi atmosphere, digital art, highly detailed, 4k, masterpiece"
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ 절대적 언어 규칙 (CHARACTER-LEVEL REQUIREMENT):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ description_kr MUST use: Korean Hangul ONLY (가-힣, U+AC00-U+D7A3)
-❌ description_kr NEVER use: Chinese Hanzi (汉字, U+4E00-U+9FFF)
-❌ description_kr NEVER use: Japanese (ひらがな, カタカナ)
-✅ prompt_en MUST be written in English only
-
-올바른 예시 (CORRECT): "로봇이 버려진 우주 정거장에서 홀로 있다"
-잘못된 예시 (WRONG): "機器人이 廢棄된 宇宙" ← DO NOT DO THIS!
-잘못된 예시 (WRONG): "孤獨한 로봇" ← DO NOT DO THIS!
-
-한국어는 한글(Hangul)로 작성하며, 한자(Hanzi/汉字)와는 완전히 다릅니다!
-한국어 필드(description_kr)에는 순수 한글만 사용하세요!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CRITICAL JSON OUTPUT REQUIREMENTS:
@@ -49,7 +34,7 @@ Required JSON Schema:
   "scenes": [
     {
       "scene_number": 1,
-      "description_kr": "장면 설명 (한국어)",
+      "description": "Scene description in English",
       "prompt_en": "Stable Diffusion prompt in English",
       "duration": 3.5
     }
@@ -65,15 +50,14 @@ INVALID Examples (DO NOT DO THIS):
 ❌ Missing commas, quotes, or brackets
 
 VALID Example (DO THIS):
-✓ {"scenes":[{"scene_number":1,"description_kr":"설명","prompt_en":"prompt","duration":5.0}],"total_scenes":1,"estimated_duration":5.0}
+✓ {"scenes":[{"scene_number":1,"description":"scene description","prompt_en":"prompt","duration":5.0}],"total_scenes":1,"estimated_duration":5.0}
 
 Content Guidelines:
 - Determine the optimal number of scenes (usually 8-15 for a 1-2 minute video)
 - Each scene should be 5-10 seconds
 - Prompts should be detailed and visually descriptive
 - Use cinematic and high-quality style tags
-- Scene descriptions (description_kr) in Korean
-- Prompts (prompt_en) in English for Stable Diffusion
+- All text in English
 
 REMEMBER: Output ONLY the JSON object. Nothing else."""
 
@@ -94,7 +78,7 @@ REMEMBER: Output ONLY the JSON object. Nothing else."""
         """Generate Stable Diffusion prompts from a story.
 
         Args:
-            expanded_story: The expanded story in Korean
+            expanded_story: The expanded story in English
             temperature: Sampling temperature (0.0-1.0)
 
         Returns:
@@ -102,7 +86,7 @@ REMEMBER: Output ONLY the JSON object. Nothing else."""
         """
         logger.info(f"Generating prompts for story (length: {len(expanded_story)} chars)")
 
-        user_prompt = f"""Story (in Korean):
+        user_prompt = f"""Story (in English):
 {expanded_story}
 
 Analyze this story and create a scene breakdown with Stable Diffusion prompts.
@@ -113,8 +97,7 @@ Determine the optimal number of scenes and create detailed prompts for each."""
                 prompt=user_prompt,
                 system_prompt=self.SYSTEM_PROMPT,
                 temperature=temperature,
-                max_tokens=2048,
-                korean_field_names=['description_kr']
+                max_tokens=2048
             )
 
             num_scenes = len(result.get('scenes', []))
@@ -136,7 +119,7 @@ Determine the optimal number of scenes and create detailed prompts for each."""
 
         Args:
             scene_number: The scene number to regenerate
-            scene_description: Korean description of the scene
+            scene_description: English description of the scene
             temperature: Sampling temperature
 
         Returns:
@@ -153,7 +136,7 @@ CRITICAL: Output ONLY valid JSON. No text before or after.
 Required JSON format:
 {{
   "scene_number": {scene_number},
-  "description_kr": "장면 설명 (한국어)",
+  "description": "Scene description in English",
   "prompt_en": "New Stable Diffusion prompt in English",
   "duration": 5.0
 }}"""
@@ -168,8 +151,7 @@ Start with { and end with }. Nothing before or after."""
                 prompt=regenerate_prompt,
                 system_prompt=regenerate_system,
                 temperature=temperature,
-                max_tokens=512,
-                korean_field_names=['description_kr']
+                max_tokens=512
             )
 
             logger.info(f"Scene {scene_number} regenerated successfully")
