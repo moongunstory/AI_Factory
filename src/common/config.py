@@ -40,6 +40,17 @@ class Config:
     COMFYUI_HOST = os.getenv("COMFYUI_HOST", "127.0.0.1")
     COMFYUI_PORT = int(os.getenv("COMFYUI_PORT", "8188"))
     COMFYUI_URL = f"http://{COMFYUI_HOST}:{COMFYUI_PORT}"
+    WAN22_WORKFLOW_TEMPLATE = (
+        ROOT_DIR
+        / "engine"
+        / "comfyui"
+        / "venv"
+        / "Lib"
+        / "site-packages"
+        / "comfyui_workflow_templates_media_video"
+        / "templates"
+        / "video_wan2_2_14B_i2v.json"
+    )
 
     # ComfyUI VRAM optimization settings
     COMFYUI_LOW_VRAM = os.getenv("COMFYUI_LOW_VRAM", "true").lower() == "true"
@@ -89,14 +100,15 @@ class Config:
             cls.ONESHOT_DIR,
             cls.SERIES_DIR,
             cls.MEME_DIR,
-            cls.CLIPS_DIR,
-            cls.IMAGES_DIR,
-            cls.VIDEO_SEGMENTS_DIR,
-            cls.FINAL_DIR,
             cls.LOGS_DIR,
             cls.PROMPTS_DIR,
         ]:
             dir_path.mkdir(parents=True, exist_ok=True)
+
+        # ensure standard sub-structure for new projects
+        for base in (cls.ONESHOT_DIR, cls.SERIES_DIR, cls.MEME_DIR):
+            for child in ("story", "prompts", "images", "video", "audio"):
+                (base / child).mkdir(parents=True, exist_ok=True)
 
     @classmethod
     def get_model_file(cls, model_name: Optional[str] = None) -> Path:

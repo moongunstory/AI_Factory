@@ -9,12 +9,10 @@ This package contains service modules for:
 
 from .llama_client import LlamaStoryClient
 from .comfy_client import ComfyUIClient
-from .wan2_client import WAN2Client
 from .pipeline import generate_short
 
 __all__ = [
     'LlamaStoryClient',
     'ComfyUIClient',
-    'WAN2Client',
     'generate_short',
 ]

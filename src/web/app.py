@@ -33,6 +33,7 @@ from src.web.services.pipeline import (
     PipelineStatus,
 )
 from src.web.services.comfy_client import ComfyUIClient
+from src.web.services.video_client import ComfyUIVideoClient
 from src.common.config import Config
 
 logger = setup_logger(__name__)
@@ -41,6 +42,9 @@ logger = setup_logger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['JSON_AS_ASCII'] = False
+
+# Ensure base output structure exists
+Config.ensure_output_dirs()
 
 # Initialize AI components (singleton)
 components = None
@@ -100,6 +104,8 @@ class ProjectStorage:
             existing_dir = cls._get_base_dir(resolved_mode) / resolved_project_id
 
         existing_dir.mkdir(parents=True, exist_ok=True)
+        for child in ("story", "prompts", "images", "video", "audio"):
+            (existing_dir / child).mkdir(parents=True, exist_ok=True)
         return existing_dir, resolved_project_id, resolved_mode
 
     @classmethod
@@ -146,6 +152,7 @@ class ProjectStorage:
         paths.setdefault('prompts', str((project_dir / 'prompts' / 'prompts.json').relative_to(project_root)))
         paths.setdefault('images', str((project_dir / 'images').relative_to(project_root)))
         paths.setdefault('video', str((project_dir / 'video' / 'final.mp4').relative_to(project_root)))
+        paths.setdefault('audio', str((project_dir / 'audio').relative_to(project_root)))
         merged['paths'] = paths
 
         cls._write_json(metadata_path, merged)
@@ -297,7 +304,7 @@ class ProjectStorage:
             except Exception:
                 images = []
 
-        video_manifest_path = project_dir / 'video' / 'segments' / 'manifest.json'
+        video_manifest_path = project_dir / 'video' / 'manifest.json'
         if video_manifest_path.exists():
             try:
                 with open(video_manifest_path, 'r', encoding='utf-8') as f:
@@ -801,41 +808,44 @@ def regenerate_images():
 
 
 # ============================================================================
-# Video Generation APIs (WAN2.2)
+# Video Generation APIs (ComfyUI WAN2.2 workflow)
 # ============================================================================
 
 @app.route('/api/generate-videos', methods=['POST'])
 def generate_videos():
-    """Generate videos from images using WAN2.2."""
+    """Generate videos from images using ComfyUI WAN2.2 workflow."""
     try:
         data = request.get_json()
         video_requests = data.get('videos', [])
         mode = data.get('mode') or 'oneshot'
         project_id = data.get('project_id')
+        options = data.get('options', {})
 
         if not video_requests:
             return jsonify({'error': 'No videos to generate'}), 400
 
-        logger.info(f"Generating videos for {len(video_requests)} scenes...")
+        logger.info(f"Generating videos for {len(video_requests)} scenes via ComfyUI...")
 
-        # Initialize WAN2.2 client
-        from src.web.services.wan2_client import WAN2Client
-        wan2_client = WAN2Client()
+        # Initialize ComfyUI workflow client
+        video_client = ComfyUIVideoClient()
 
         # Create output directory
-        from datetime import datetime
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         project_dir, resolved_id, resolved_mode = ProjectStorage.get_project_dir(mode, project_id)
-        videos_dir = project_dir / 'video' / 'segments' / timestamp
+        videos_dir = project_dir / 'video'
         videos_dir.mkdir(parents=True, exist_ok=True)
 
         generated_videos = []
 
+        default_duration = float(options.get('duration', 2.5) or 2.5)
+        default_camera = options.get('camera') or 'cinematic movement'
+        default_fps = int(options.get('fps', 24) or 24)
+
         for i, video_req in enumerate(video_requests, 1):
             scene_number = video_req.get('scene_number')
             image_path = project_root / video_req.get('image_path')
-            video_prompt = video_req.get('video_prompt', 'cinematic movement')
-            duration = video_req.get('duration', 2.5)
+            video_prompt = video_req.get('video_prompt', default_camera)
+            duration = float(video_req.get('duration', default_duration) or default_duration)
+            fps = int(video_req.get('fps', default_fps) or default_fps)
 
             if not image_path.exists():
                 logger.warning(f"Image not found for scene {scene_number}: {image_path}")
@@ -853,13 +863,12 @@ def generate_videos():
             video_path = videos_dir / f"scene_{scene_number:03d}.mp4"
 
             try:
-                wan2_client.generate_scene_video(
+                video_client.generate_video(
                     image_path=image_path,
-                    prompt=video_prompt,
-                    out_path=video_path,
+                    output_path=video_path,
                     duration_sec=duration,
-                    fps=24,
-                    motion_strength=0.7
+                    fps=fps,
+                    camera_prompt=video_prompt,
                 )
 
                 # Store relative path for frontend
@@ -869,7 +878,8 @@ def generate_videos():
                     'scene_number': scene_number,
                     'video_path': relative_path,
                     'video_prompt': video_prompt,
-                    'duration': duration
+                    'duration': duration,
+                    'fps': fps
                 })
 
                 logger.info(f"✓ Video {i}/{len(video_requests)} generated: {video_path.name}")
@@ -885,10 +895,10 @@ def generate_videos():
                 })
 
         # Persist manifest for resume support
-        manifest_path = videos_dir.parent / 'manifest.json'
+        manifest_path = videos_dir / 'manifest.json'
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         with open(manifest_path, 'w', encoding='utf-8') as manifest_file:
-            json.dump({'videos': generated_videos, 'timestamp': timestamp}, manifest_file, ensure_ascii=False, indent=2)
+            json.dump({'videos': generated_videos}, manifest_file, ensure_ascii=False, indent=2)
 
         try:
             ProjectStorage.write_metadata(
@@ -906,7 +916,6 @@ def generate_videos():
         return jsonify({
             'success': True,
             'videos': generated_videos,
-            'timestamp': timestamp,
             'project_id': resolved_id,
         })
 
@@ -1103,6 +1112,37 @@ def delete_project():
     except Exception as e:
         logger.error(f"Failed to delete project: {e}")
         return jsonify({'error': f'Failed to delete project: {str(e)}'}), 500
+
+
+@app.route('/api/delete-file', methods=['POST'])
+def delete_file():
+    """Delete a single output file within the project output directory."""
+    try:
+        data = request.get_json()
+        rel_path = data.get('path')
+
+        if not rel_path:
+            return jsonify({'error': 'Path is required'}), 400
+
+        target_path = (project_root / rel_path).resolve()
+        base_output = Config.OUTPUT_DIR.resolve()
+
+        if base_output not in target_path.parents and target_path != base_output:
+            return jsonify({'error': 'Only files inside the output directory can be deleted'}), 400
+
+        if not target_path.exists():
+            return jsonify({'error': 'File not found'}), 404
+
+        if target_path.is_dir():
+            return jsonify({'error': 'Directory deletion is not allowed via this endpoint'}), 400
+
+        target_path.unlink()
+        logger.info(f"Deleted file: {target_path}")
+        return jsonify({'success': True})
+
+    except Exception as e:
+        logger.error(f"Failed to delete file: {e}")
+        return jsonify({'error': f'Failed to delete file: {str(e)}'}), 500
 
 
 # ============================================================================
@@ -1405,7 +1445,7 @@ def check_consistency(universe_id):
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Check health of all backend engines (llama-server, ComfyUI, WAN2.2)."""
+    """Check health of all backend engines (llama-server, ComfyUI)."""
     try:
         health = check_engines_health()
 
@@ -1414,8 +1454,7 @@ def health_check():
             'ok': health['overall'],
             'engines': {
                 'llama_server': health['llama_server'],
-                'comfyui': health['comfyui'],
-                'wan22': health['wan22']
+                'comfyui': health['comfyui']
             }
         })
 
