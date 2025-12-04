@@ -63,31 +63,6 @@ header h1 {
     min-width: 240px;
 }
 
-.project-name-label {
-    display: block;
-    font-weight: 700;
-    color: #444;
-    margin-bottom: 6px;
-}
-
-.project-name-input {
-    width: 100%;
-}
-
-.project-save-status {
-    margin-top: 8px;
-    color: #4b5563;
-    font-size: 0.95rem;
-}
-
-.project-save-status.success {
-    color: #2d8a34;
-}
-
-.project-save-status.error {
-    color: #c0392b;
-}
-
 .project-actions {
     display: flex;
     align-items: center;
@@ -96,16 +71,16 @@ header h1 {
     justify-content: flex-end;
 }
 
-.autosave-toggle {
+.project-filters {
     display: flex;
     align-items: center;
-    gap: 6px;
-    background: #eef1ff;
-    border: 1px solid #dfe3ff;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-weight: 600;
-    color: #555;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.filter-hint {
+    color: #6b7280;
+    font-size: 0.95rem;
 }
 
 /* Tab Navigation */
@@ -793,6 +768,15 @@ hr {
 
 .btn-success:hover {
     background: #218838;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
 }
 
 .btn-small {

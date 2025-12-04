@@ -34,8 +34,6 @@ const AppState = {
     projectId: null,
     projectPath: null,
     projectName: '',
-    autoSaveEnabled: false,
-    autoSaveTimer: null,
 
     // Final assembly
     finalVideoPath: null,
@@ -196,122 +194,26 @@ async function apiCall(url, method = 'GET', data = null) {
     }
 }
 
-// ============================================================================
-// Project Save/Load
-// ============================================================================
+// ===========================================================================
+// Project Load / Delete (autosave backend)
+// ===========================================================================
 
-let saveInFlight = false;
-
-function updateSaveStatus(message, status = 'info') {
-    const statusEl = document.getElementById('project-save-status');
-    if (!statusEl) return;
-
-    statusEl.textContent = message;
-    statusEl.classList.remove('success', 'error');
-
-    if (status === 'success') {
-        statusEl.classList.add('success');
-    } else if (status === 'error') {
-        statusEl.classList.add('error');
-    }
-}
-
-function hasDataToSave() {
-    return Boolean(
-        AppState.storyIdea ||
-        AppState.expandedStory ||
-        (AppState.scenes && AppState.scenes.length > 0) ||
-        (AppState.generatedImages && AppState.generatedImages.length > 0) ||
-        (AppState.generatedVideos && AppState.generatedVideos.length > 0) ||
-        AppState.finalVideoPath
-    );
-}
-
-async function saveCurrentProject(silent = false) {
-    if (saveInFlight) return;
-
-    const projectNameInput = document.getElementById('project-name-input');
-    const projectName = projectNameInput?.value.trim() || 'Untitled';
-
-    AppState.projectName = projectName;
-
-    if (!hasDataToSave()) {
-        updateSaveStatus('저장할 데이터가 없습니다. 작업을 진행해 주세요.', 'error');
-        if (!silent) alert('저장할 데이터가 없습니다. 먼저 스토리나 이미지를 생성해 주세요.');
-        return;
-    }
-
-    saveInFlight = true;
-    updateSaveStatus('저장 중...');
-
-    try {
-        const result = await apiCall('/api/save-project', 'POST', {
-            project_name: projectName
-        });
-
-        AppState.projectId = result.project_id;
-        AppState.projectPath = result.project_path;
-        AppState.lastSavedAt = new Date();
-
-        const timeText = AppState.lastSavedAt.toLocaleTimeString('ko-KR', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        updateSaveStatus(`저장됨 (${timeText})`, 'success');
-
-        if (!silent) {
-            alert('프로젝트가 저장되었습니다.');
-        }
-    } catch (error) {
-        updateSaveStatus('저장 실패. 다시 시도해 주세요.', 'error');
-        if (!silent) {
-            alert(`프로젝트 저장 실패: ${error.message}`);
-        }
-    } finally {
-        saveInFlight = false;
-    }
-}
-
-function startAutoSaveLoop() {
-    AppState.autoSaveEnabled = true;
-
-    if (AppState.autoSaveTimer) {
-        clearInterval(AppState.autoSaveTimer);
-    }
-
-    updateSaveStatus('자동 저장 대기 중...');
-
-    AppState.autoSaveTimer = setInterval(() => {
-        if (!AppState.autoSaveEnabled) return;
-        if (!hasDataToSave()) return;
-
-        saveCurrentProject(true);
-    }, 60 * 1000);
-}
-
-function stopAutoSaveLoop() {
-    AppState.autoSaveEnabled = false;
-
-    if (AppState.autoSaveTimer) {
-        clearInterval(AppState.autoSaveTimer);
-        AppState.autoSaveTimer = null;
-    }
-
-    updateSaveStatus('자동 저장이 꺼져 있습니다. 필요 시 직접 저장해 주세요.');
-}
+let selectedProject = null;
 
 async function fetchProjectList() {
     const loadingEl = document.getElementById('load-project-loading');
     const listEl = document.getElementById('project-list');
     const emptyEl = document.getElementById('no-project-message');
+    const filterEl = document.getElementById('project-mode-filter');
 
     if (loadingEl) loadingEl.classList.remove('hidden');
     listEl?.classList.add('hidden');
     emptyEl?.classList.add('hidden');
 
     try {
-        const result = await apiCall('/api/list-projects');
+        const modeFilter = filterEl?.value === 'all' ? '' : filterEl?.value;
+        const query = modeFilter ? `?mode=${modeFilter}` : '';
+        const result = await apiCall(`/api/list-projects${query}`);
         const projects = result.projects || [];
 
         if (projects.length === 0) {
@@ -335,28 +237,50 @@ function renderProjectList(projects) {
     if (!listEl) return;
 
     listEl.innerHTML = '';
+    selectedProject = null;
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        delete confirmBtn.dataset.selectedProject;
+    }
 
     projects.forEach(project => {
         const card = document.createElement('div');
         card.className = 'project-card';
         card.dataset.projectId = project.project_id;
+        card.dataset.projectMode = project.mode || 'oneshot';
 
         const created = project.created_at ? project.created_at : '시간 정보 없음';
+        const step = project.current_step ? `진행 단계: Step ${project.current_step}` : '진행 정보 없음';
 
         card.innerHTML = `
-            <div class="title">${project.project_name || project.project_id}</div>
+            <div class="title">${project.project_title || project.project_id}</div>
             <div class="meta">생성: ${created} | 모드: ${project.mode || 'N/A'}</div>
+            <div class="meta">${step}</div>
             <div class="tag">${project.theme || '기본 테마'}</div>
+            <button class="btn btn-small btn-danger project-delete-btn" type="button">삭제</button>
         `;
 
         card.addEventListener('click', () => {
             document.querySelectorAll('.project-card').forEach(c => c.classList.remove('active'));
             card.classList.add('active');
+            selectedProject = project;
 
             if (confirmBtn) {
                 confirmBtn.disabled = false;
                 confirmBtn.dataset.selectedProject = project.project_id;
+                confirmBtn.dataset.projectMode = project.mode || 'oneshot';
             }
+        });
+
+        const deleteBtn = card.querySelector('.project-delete-btn');
+        deleteBtn.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            if (!confirm('프로젝트를 삭제할까요? 삭제하면 복구할 수 없습니다.')) return;
+            await apiCall('/api/delete-project', 'POST', {
+                project_id: project.project_id,
+                mode: project.mode || 'oneshot'
+            });
+            fetchProjectList();
         });
 
         listEl.appendChild(card);
@@ -381,21 +305,22 @@ function closeLoadModal() {
     if (confirmBtn) {
         confirmBtn.disabled = true;
         delete confirmBtn.dataset.selectedProject;
+        delete confirmBtn.dataset.projectMode;
     }
 }
 
 async function handleProjectLoad() {
     const confirmBtn = document.getElementById('confirm-load-btn');
     const projectId = confirmBtn?.dataset.selectedProject;
+    const projectMode = confirmBtn?.dataset.projectMode || 'oneshot';
 
     if (!projectId) return;
 
     confirmBtn.disabled = true;
-    updateSaveStatus('프로젝트를 불러오는 중...');
 
     try {
-        const result = await apiCall('/api/load-project', 'POST', { project_id: projectId });
-        applyLoadedProject(result.project_data);
+        const result = await apiCall('/api/load-project', 'POST', { project_id: projectId, mode: projectMode });
+        applyLoadedProject(result.project);
         closeLoadModal();
         alert('프로젝트를 불러왔습니다.');
     } catch (error) {
@@ -405,27 +330,23 @@ async function handleProjectLoad() {
     }
 }
 
-function applyLoadedProject(projectData) {
-    if (!projectData) return;
+function applyLoadedProject(projectEnvelope) {
+    if (!projectEnvelope) return;
 
-    AppState.projectId = projectData.project_id;
-    AppState.projectPath = projectData.project_path;
-    AppState.projectName = projectData.project_name || '';
+    const { metadata, story, prompts, images, final_video: finalVideo } = projectEnvelope;
 
-    const nameInput = document.getElementById('project-name-input');
-    if (nameInput) nameInput.value = AppState.projectName;
-
-    AppState.mode = projectData.mode || AppState.mode;
-    AppState.theme = projectData.theme || AppState.theme;
-    AppState.storyIdea = projectData.simple_idea || '';
-    AppState.expandedStory = projectData.expanded_story || '';
-    AppState.characterSheets = projectData.character_sheets || { characters: [] };
-    AppState.scenes = (projectData.prompts_data && projectData.prompts_data.scenes) || [];
-    AppState.generatedImages = projectData.generated_images || [];
-    AppState.generatedVideos = projectData.generated_videos || [];
-    AppState.finalVideoPath = projectData.final_video_path || null;
-    AppState.finalVideoDuration = projectData.duration || projectData.total_duration || null;
-    AppState.finalVideoResolution = projectData.resolution || null;
+    AppState.projectId = metadata?.project_id || null;
+    AppState.projectName = metadata?.project_title || '';
+    AppState.mode = metadata?.mode || AppState.mode;
+    AppState.theme = prompts?.theme || AppState.theme;
+    AppState.storyIdea = story?.simple_idea || '';
+    AppState.expandedStory = story?.expanded_story || '';
+    AppState.characterSheets = story?.character_sheets || { characters: [] };
+    AppState.scenes = prompts?.scenes || [];
+    AppState.generatedImages = images || [];
+    AppState.finalVideoPath = finalVideo?.path || null;
+    AppState.finalVideoDuration = finalVideo?.duration || null;
+    AppState.finalVideoResolution = finalVideo?.resolution || null;
 
     const storyInput = document.getElementById('story-idea-input');
     if (storyInput) storyInput.value = AppState.storyIdea || '';
@@ -435,7 +356,6 @@ function applyLoadedProject(projectData) {
         themeSelect.value = AppState.theme;
     }
 
-    // Highlight mode selection
     document.querySelectorAll('.mode-card').forEach(card => card.classList.remove('selected'));
     if (AppState.mode === 'series') {
         document.getElementById('mode-series')?.classList.add('selected');
@@ -445,80 +365,62 @@ function applyLoadedProject(projectData) {
 
     updateModeUiState();
 
-    let step = 1;
+    let step = metadata?.current_step || 1;
 
     if (AppState.expandedStory) {
         displayExpandedStory();
-        step = 2;
-        showSection('step-2-story-expanded');
     }
 
     if (AppState.scenes && AppState.scenes.length > 0) {
         displayScenes();
-        step = 3;
-        showSection('step-3-prompts');
     }
 
     if (AppState.generatedImages && AppState.generatedImages.length > 0) {
         displayImages();
-        step = 4;
-    }
-
-    if (AppState.generatedVideos && AppState.generatedVideos.length > 0) {
-        displayVideos();
-        document.getElementById('proceed-to-assembly-btn')?.classList.remove('hidden');
-        showSection('step-4-video-generation');
-        step = 4;
     }
 
     if (AppState.finalVideoPath) {
         displayFinalVideoResult();
-        showSection('step-5-final-assembly');
-        step = 5;
     }
+
+    let targetSection = 'step-1-story-input';
+    if (step >= 5 && AppState.finalVideoPath) {
+        targetSection = 'step-5-final-assembly';
+    } else if (step >= 4 && AppState.generatedImages?.length) {
+        targetSection = 'step-4-video-generation';
+    } else if (step >= 3 && AppState.scenes?.length) {
+        targetSection = 'step-3-prompts';
+    } else if (step >= 2 && AppState.expandedStory) {
+        targetSection = 'step-2-story-expanded';
+    }
+
+    showSection(targetSection);
 
     AppState.currentStep = step;
     updateProgressBar(step);
-    updateSaveStatus('불러온 프로젝트가 적용되었습니다.', 'success');
 }
 
 function initProjectControls() {
-    const saveBtn = document.getElementById('save-project-btn');
     const loadBtn = document.getElementById('load-project-btn');
     const oneshotLoadBtn = document.getElementById('oneshot-load-btn');
     const closeModalBtn = document.getElementById('close-load-modal');
     const refreshBtn = document.getElementById('refresh-project-list-btn');
     const confirmLoadBtn = document.getElementById('confirm-load-btn');
-    const autosaveToggle = document.getElementById('autosave-toggle');
-    const projectNameInput = document.getElementById('project-name-input');
     const modal = document.getElementById('load-project-modal');
+    const filterEl = document.getElementById('project-mode-filter');
 
-    saveBtn?.addEventListener('click', () => saveCurrentProject());
     loadBtn?.addEventListener('click', () => openLoadModal());
     oneshotLoadBtn?.addEventListener('click', () => openLoadModal());
     closeModalBtn?.addEventListener('click', () => closeLoadModal());
     refreshBtn?.addEventListener('click', () => fetchProjectList());
     confirmLoadBtn?.addEventListener('click', () => handleProjectLoad());
-
-    autosaveToggle?.addEventListener('change', (event) => {
-        if (event.target.checked) {
-            startAutoSaveLoop();
-        } else {
-            stopAutoSaveLoop();
-        }
-    });
-
-    projectNameInput?.addEventListener('input', (event) => {
-        AppState.projectName = event.target.value;
-    });
+    filterEl?.addEventListener('change', () => fetchProjectList());
 
     modal?.addEventListener('click', (event) => {
         if (event.target === modal) {
             closeLoadModal();
         }
     });
-
-    updateSaveStatus('아직 저장되지 않았습니다');
 }
 
 // ============================================================================
@@ -870,7 +772,8 @@ async function expandStory() {
     try {
         // Step 1: Expand story
         const expandResult = await apiCall('/api/expand-story', 'POST', {
-            simple_idea: storyIdea
+            simple_idea: storyIdea,
+            mode: AppState.mode || 'oneshot'
         });
 
         AppState.expandedStory = expandResult.expanded_story;

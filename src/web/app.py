@@ -3,6 +3,9 @@ import os
 import sys
 import atexit
 import signal
+import json
+import re
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session, send_from_directory
 from pathlib import Path
 
@@ -41,6 +44,210 @@ app.config['JSON_AS_ASCII'] = False
 
 # Initialize AI components (singleton)
 components = None
+
+
+class ProjectStorage:
+    """Utility for project-scoped persistence following the new autosave rules."""
+
+    BASE_DIRS = {
+        'oneshot': Config.ONESHOT_DIR,
+        'series': Config.SERIES_DIR,
+        'meme': Config.MEME_DIR,
+    }
+
+    @classmethod
+    def _sanitize_title(cls, title: str) -> str:
+        cleaned = re.sub(r"[^a-zA-Z0-9가-힣_-]+", "_", title or "")
+        cleaned = cleaned.strip("_")
+        return cleaned or "project"
+
+    @classmethod
+    def _get_base_dir(cls, mode: str):
+        return cls.BASE_DIRS.get(mode, Config.ONESHOT_DIR)
+
+    @classmethod
+    def get_project_dir(cls, mode: str | None = None, title: str | None = None) -> Path:
+        mode = mode or session.get('mode') or 'oneshot'
+        project_id = session.get('project_id')
+        created_at = session.get('project_created_at')
+
+        if not project_id or not created_at:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            created_at = timestamp
+            safe_title = cls._sanitize_title(title or session.get('project_title') or 'project')
+            project_id = f"{timestamp}_{safe_title}"
+
+            session['project_id'] = project_id
+            session['project_created_at'] = created_at
+            session['project_title'] = title or session.get('project_title') or 'Untitled'
+
+        project_dir = cls._get_base_dir(mode) / project_id
+        project_dir.mkdir(parents=True, exist_ok=True)
+        return project_dir
+
+    @classmethod
+    def _write_json(cls, path: Path, payload: dict) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    @classmethod
+    def write_metadata(cls, current_step: int | None = None, **kwargs) -> dict:
+        project_dir = cls.get_project_dir()
+        metadata_path = project_dir / 'metadata.json'
+        existing = {}
+        if metadata_path.exists():
+            try:
+                with open(metadata_path, 'r', encoding='utf-8') as f:
+                    existing = json.load(f)
+            except Exception:
+                existing = {}
+
+        merged = {
+            **existing,
+            'project_id': session.get('project_id'),
+            'project_title': session.get('project_title') or session.get('simple_idea') or existing.get('project_title') or 'Untitled',
+            'mode': session.get('mode') or existing.get('mode') or 'oneshot',
+            'created_at': session.get('project_created_at') or existing.get('created_at') or datetime.now().strftime('%Y%m%d_%H%M%S'),
+        }
+
+        if current_step is not None:
+            merged['current_step'] = max(current_step, existing.get('current_step', 0))
+
+        merged.update(kwargs)
+
+        paths = merged.get('paths', {})
+        paths.setdefault('story', str((project_dir / 'story' / 'story.json').relative_to(project_root)))
+        paths.setdefault('prompts', str((project_dir / 'prompts' / 'prompts.json').relative_to(project_root)))
+        paths.setdefault('images', str((project_dir / 'images').relative_to(project_root)))
+        paths.setdefault('video', str((project_dir / 'video' / 'final.mp4').relative_to(project_root)))
+        merged['paths'] = paths
+
+        cls._write_json(metadata_path, merged)
+        return merged
+
+    @classmethod
+    def save_story(cls, story_payload: dict) -> dict:
+        project_dir = cls.get_project_dir(title=story_payload.get('project_title'))
+        story_path = project_dir / 'story' / 'story.json'
+        cls._write_json(story_path, story_payload)
+        return cls.write_metadata(current_step=1)
+
+    @classmethod
+    def save_prompts(cls, prompts_payload: dict) -> dict:
+        project_dir = cls.get_project_dir()
+        prompts_path = project_dir / 'prompts' / 'prompts.json'
+        cls._write_json(prompts_path, prompts_payload)
+        return cls.write_metadata(current_step=2, theme=prompts_payload.get('theme'))
+
+    @classmethod
+    def save_images_manifest(cls, images_payload: list) -> dict:
+        project_dir = cls.get_project_dir()
+        manifest_path = project_dir / 'images' / 'manifest.json'
+        cls._write_json(manifest_path, {'images': images_payload})
+        return cls.write_metadata(current_step=3)
+
+    @classmethod
+    def save_video_info(cls, final_path: Path, duration: float | None = None, resolution: str | None = None) -> dict:
+        return cls.write_metadata(
+            current_step=4,
+            final_video={
+                'path': str(final_path.relative_to(project_root)),
+                'duration': duration,
+                'resolution': resolution,
+            },
+        )
+
+    @classmethod
+    def list_projects(cls, mode_filter: str | None = None) -> list[dict]:
+        projects = []
+        mode_dirs = [
+            ('oneshot', Config.ONESHOT_DIR),
+            ('series', Config.SERIES_DIR),
+            ('meme', Config.MEME_DIR),
+        ]
+
+        for mode_name, base_dir in mode_dirs:
+            if mode_filter and mode_filter != mode_name:
+                continue
+            if not base_dir.exists():
+                continue
+            for project_dir in base_dir.iterdir():
+                metadata_path = project_dir / 'metadata.json'
+                if metadata_path.exists():
+                    try:
+                        with open(metadata_path, 'r', encoding='utf-8') as f:
+                            metadata = json.load(f)
+                            metadata['mode'] = metadata.get('mode') or mode_name
+                            projects.append(metadata)
+                    except Exception as exc:
+                        logger.warning(f"Failed to read metadata for {project_dir.name}: {exc}")
+
+        projects.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        return projects
+
+    @classmethod
+    def load_project(cls, mode: str, project_id: str) -> dict:
+        project_dir = cls._get_base_dir(mode) / project_id
+        metadata_path = project_dir / 'metadata.json'
+        if not metadata_path.exists():
+            raise FileNotFoundError("metadata.json not found")
+
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+
+        story_data = None
+        story_path = project_dir / 'story' / 'story.json'
+        if story_path.exists():
+            with open(story_path, 'r', encoding='utf-8') as f:
+                story_data = json.load(f)
+
+        prompts_data = None
+        prompts_path = project_dir / 'prompts' / 'prompts.json'
+        if prompts_path.exists():
+            with open(prompts_path, 'r', encoding='utf-8') as f:
+                prompts_data = json.load(f)
+
+        images = []
+        manifest_path = project_dir / 'images' / 'manifest.json'
+        if manifest_path.exists():
+            try:
+                with open(manifest_path, 'r', encoding='utf-8') as f:
+                    manifest = json.load(f)
+                    images = manifest.get('images', [])
+            except Exception:
+                images = []
+
+        final_video = metadata.get('final_video')
+
+        session['project_id'] = metadata.get('project_id')
+        session['project_title'] = metadata.get('project_title')
+        session['project_created_at'] = metadata.get('created_at')
+        session['mode'] = metadata.get('mode') or mode
+        session['theme'] = metadata.get('theme') or session.get('theme')
+        session['simple_idea'] = story_data.get('simple_idea') if story_data else None
+        session['expanded_story'] = story_data.get('expanded_story') if story_data else None
+        session['character_sheets'] = story_data.get('character_sheets') if story_data else None
+        session['prompts_data'] = prompts_data
+        session['generated_images'] = images
+        session['final_video_path'] = final_video.get('path') if final_video else None
+        session['final_timestamp'] = metadata.get('created_at')
+
+        return {
+            'metadata': metadata,
+            'story': story_data,
+            'prompts': prompts_data,
+            'images': images,
+            'final_video': final_video,
+        }
+
+    @classmethod
+    def delete_project(cls, mode: str, project_id: str) -> None:
+        project_dir = cls._get_base_dir(mode) / project_id
+        if project_dir.exists():
+            import shutil
+
+            shutil.rmtree(project_dir, ignore_errors=True)
 
 def get_components():
     """Initialize and cache AI components."""
@@ -107,6 +314,7 @@ def expand_story():
     try:
         data = request.get_json()
         simple_idea = data.get('simple_idea', '').strip()
+        session['mode'] = data.get('mode') or session.get('mode') or 'oneshot'
 
         if not simple_idea:
             return jsonify({'error': 'Please enter a story idea'}), 400
@@ -122,6 +330,12 @@ def expand_story():
         # Store in session
         session['expanded_story'] = expanded
         session['simple_idea'] = simple_idea
+
+        ProjectStorage.save_story({
+            'simple_idea': simple_idea,
+            'expanded_story': expanded,
+            'project_title': simple_idea,
+        })
 
         return jsonify({
             'success': True,
@@ -180,6 +394,19 @@ def generate_prompts():
         session['prompts_data'] = prompts_data
         session['theme'] = theme
         session['character_sheets'] = character_sheets
+
+        ProjectStorage.save_story({
+            'simple_idea': session.get('simple_idea'),
+            'expanded_story': expanded_story,
+            'character_sheets': character_sheets,
+            'project_title': session.get('project_title') or session.get('simple_idea') or 'Untitled',
+        })
+        ProjectStorage.save_prompts({
+            'scenes': scenes,
+            'total_scenes': scenes_result.get('total_scenes', len(scenes)),
+            'estimated_duration': scenes_result.get('estimated_duration', 0),
+            'theme': theme,
+        })
 
         logger.info(f"Generated {len(scenes)} scenes successfully")
         logger.info(f"Extracted {len(character_sheets.get('characters', []))} characters")
@@ -308,10 +535,8 @@ def generate_images():
         if not comfy_client.is_healthy():
             return jsonify({'error': 'ComfyUI server is not running. Please start ComfyUI first.'}), 500
 
-        # Create output directory
-        from datetime import datetime
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        images_dir = Config.IMAGES_DIR / timestamp
+        project_dir = ProjectStorage.get_project_dir()
+        images_dir = project_dir / 'images'
         images_dir.mkdir(parents=True, exist_ok=True)
 
         generated_images = []
@@ -326,7 +551,7 @@ def generate_images():
 
             logger.info(f"Generating image {i}/{len(scenes)}: Scene {scene_number}...")
 
-            image_path = images_dir / f"scene_{scene_number:03d}.png"
+            image_path = images_dir / f"{scene_number:03d}.png"
 
             try:
                 metadata = comfy_client.generate_vertical_image(
@@ -363,14 +588,14 @@ def generate_images():
 
         # Store generated images in session
         session['generated_images'] = generated_images
-        session['images_timestamp'] = timestamp
+        ProjectStorage.save_images_manifest(generated_images)
 
         logger.info(f"Generated {len([img for img in generated_images if img['image_path']])} images successfully")
 
         return jsonify({
             'success': True,
             'images': generated_images,
-            'timestamp': timestamp
+            'project_id': session.get('project_id')
         })
 
     except Exception as e:
@@ -401,14 +626,8 @@ def regenerate_images():
         if not comfy_client.is_healthy():
             return jsonify({'error': 'ComfyUI server is not running. Please start ComfyUI first.'}), 500
 
-        # Get timestamp from session or create new
-        timestamp = session.get('images_timestamp')
-        if not timestamp:
-            from datetime import datetime
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            session['images_timestamp'] = timestamp
-
-        images_dir = Config.IMAGES_DIR / timestamp
+        project_dir = ProjectStorage.get_project_dir()
+        images_dir = project_dir / 'images'
         images_dir.mkdir(parents=True, exist_ok=True)
 
         regenerated_images = []
@@ -423,7 +642,7 @@ def regenerate_images():
 
             logger.info(f"Regenerating image for scene {scene_number}...")
 
-            image_path = images_dir / f"scene_{scene_number:03d}.png"
+            image_path = images_dir / f"{scene_number:03d}.png"
 
             try:
                 metadata = comfy_client.generate_vertical_image(
@@ -458,9 +677,13 @@ def regenerate_images():
                     'error': str(e)
                 })
 
+        session['generated_images'] = regenerated_images
+        ProjectStorage.save_images_manifest(regenerated_images)
+
         return jsonify({
             'success': True,
-            'images': regenerated_images
+            'images': regenerated_images,
+            'project_id': session.get('project_id')
         })
 
     except Exception as e:
@@ -586,17 +809,15 @@ def assemble_final_video():
         if not valid_videos:
             return jsonify({'error': 'No valid video segments found'}), 400
 
-        # Create output directory
-        from datetime import datetime
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        final_dir = Config.FINAL_DIR / timestamp
+        project_dir = ProjectStorage.get_project_dir()
+        final_dir = project_dir / 'video'
         final_dir.mkdir(parents=True, exist_ok=True)
 
         # Prepare video paths
         video_paths = [project_root / v['video_path'] for v in valid_videos]
 
         # Generate output path
-        final_video_path = final_dir / "short_final.mp4"
+        final_video_path = final_dir / "final.mp4"
 
         # Use ffmpeg to concatenate videos
         import subprocess
@@ -661,8 +882,9 @@ def assemble_final_video():
 
             # Store in session
             session['final_video_path'] = relative_path
-            session['final_timestamp'] = timestamp
+            session['final_timestamp'] = datetime.now().strftime('%Y%m%d_%H%M%S')
 
+            metadata = ProjectStorage.save_video_info(final_video_path, duration=total_duration, resolution=resolution)
             logger.info(f"Final video assembly complete: {relative_path}")
 
             return jsonify({
@@ -670,7 +892,7 @@ def assemble_final_video():
                 'final_video_path': relative_path,
                 'duration': total_duration,
                 'resolution': resolution,
-                'timestamp': timestamp
+                'metadata': metadata
             })
 
         finally:
@@ -690,101 +912,27 @@ def assemble_final_video():
 # Project Save/Load APIs
 # ============================================================================
 
-@app.route('/api/save-project', methods=['POST'])
-def save_project():
-    """Save current project state."""
-    try:
-        data = request.get_json()
-        project_name = data.get('project_name', 'Untitled')
-
-        # Create project directory
-        from datetime import datetime
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        project_id = f"{timestamp}_{project_name.replace(' ', '_')}"
-        project_dir = Config.OUTPUT_DIR / 'projects' / project_id
-        project_dir.mkdir(parents=True, exist_ok=True)
-
-        # Save project data
-        import json
-
-        project_data = {
-            'project_id': project_id,
-            'project_name': project_name,
-            'created_at': timestamp,
-            'mode': session.get('mode'),
-            'theme': session.get('theme'),
-            'simple_idea': session.get('simple_idea'),
-            'expanded_story': session.get('expanded_story'),
-            'character_sheets': session.get('character_sheets'),
-            'prompts_data': session.get('prompts_data'),
-            'generated_images': session.get('generated_images'),
-            'generated_videos': session.get('generated_videos'),
-            'final_video_path': session.get('final_video_path'),
-            'images_timestamp': session.get('images_timestamp'),
-            'videos_timestamp': session.get('videos_timestamp'),
-            'final_timestamp': session.get('final_timestamp')
-        }
-
-        # Write to JSON file
-        project_file = project_dir / 'project.json'
-        with open(project_file, 'w', encoding='utf-8') as f:
-            json.dump(project_data, f, ensure_ascii=False, indent=2)
-
-        logger.info(f"Project saved: {project_id}")
-
-        return jsonify({
-            'success': True,
-            'project_id': project_id,
-            'project_path': str(project_dir.relative_to(project_root))
-        })
-
-    except Exception as e:
-        logger.error(f"Project save failed: {e}")
-        return jsonify({'error': f'Project save failed: {str(e)}'}), 500
-
-
 @app.route('/api/load-project', methods=['POST'])
 def load_project():
-    """Load a saved project."""
+    """Load a saved project using metadata.json."""
     try:
         data = request.get_json()
         project_id = data.get('project_id')
+        mode = data.get('mode', 'oneshot')
 
         if not project_id:
             return jsonify({'error': 'Project ID is required'}), 400
 
-        project_dir = Config.OUTPUT_DIR / 'projects' / project_id
-        project_file = project_dir / 'project.json'
-
-        if not project_file.exists():
-            return jsonify({'error': 'Project not found'}), 404
-
-        # Load project data
-        import json
-        with open(project_file, 'r', encoding='utf-8') as f:
-            project_data = json.load(f)
-
-        # Restore session state
-        session['mode'] = project_data.get('mode')
-        session['theme'] = project_data.get('theme')
-        session['simple_idea'] = project_data.get('simple_idea')
-        session['expanded_story'] = project_data.get('expanded_story')
-        session['character_sheets'] = project_data.get('character_sheets')
-        session['prompts_data'] = project_data.get('prompts_data')
-        session['generated_images'] = project_data.get('generated_images')
-        session['generated_videos'] = project_data.get('generated_videos')
-        session['final_video_path'] = project_data.get('final_video_path')
-        session['images_timestamp'] = project_data.get('images_timestamp')
-        session['videos_timestamp'] = project_data.get('videos_timestamp')
-        session['final_timestamp'] = project_data.get('final_timestamp')
-
+        loaded = ProjectStorage.load_project(mode, project_id)
         logger.info(f"Project loaded: {project_id}")
 
         return jsonify({
             'success': True,
-            'project_data': project_data
+            'project': loaded
         })
 
+    except FileNotFoundError:
+        return jsonify({'error': 'Project not found'}), 404
     except Exception as e:
         logger.error(f"Project load failed: {e}")
         return jsonify({'error': f'Project load failed: {str(e)}'}), 500
@@ -792,37 +940,10 @@ def load_project():
 
 @app.route('/api/list-projects', methods=['GET'])
 def list_projects():
-    """List all saved projects."""
+    """List all saved projects using metadata.json in the new directory structure."""
     try:
-        projects_dir = Config.OUTPUT_DIR / 'projects'
-        if not projects_dir.exists():
-            return jsonify({
-                'success': True,
-                'projects': []
-            })
-
-        projects = []
-        import json
-
-        for project_dir in projects_dir.iterdir():
-            if project_dir.is_dir():
-                project_file = project_dir / 'project.json'
-                if project_file.exists():
-                    try:
-                        with open(project_file, 'r', encoding='utf-8') as f:
-                            project_data = json.load(f)
-                            projects.append({
-                                'project_id': project_data.get('project_id'),
-                                'project_name': project_data.get('project_name'),
-                                'created_at': project_data.get('created_at'),
-                                'mode': project_data.get('mode'),
-                                'theme': project_data.get('theme')
-                            })
-                    except Exception as e:
-                        logger.warning(f"Failed to load project {project_dir.name}: {e}")
-
-        # Sort by created_at descending
-        projects.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        mode_filter = request.args.get('mode')
+        projects = ProjectStorage.list_projects(mode_filter)
 
         return jsonify({
             'success': True,
@@ -832,6 +953,25 @@ def list_projects():
     except Exception as e:
         logger.error(f"Failed to list projects: {e}")
         return jsonify({'error': f'Failed to list projects: {str(e)}'}), 500
+
+
+@app.route('/api/delete-project', methods=['POST'])
+def delete_project():
+    """Delete a project folder immediately."""
+    try:
+        data = request.get_json()
+        project_id = data.get('project_id')
+        mode = data.get('mode', 'oneshot')
+
+        if not project_id:
+            return jsonify({'error': 'Project ID is required'}), 400
+
+        ProjectStorage.delete_project(mode, project_id)
+        return jsonify({'success': True})
+
+    except Exception as e:
+        logger.error(f"Failed to delete project: {e}")
+        return jsonify({'error': f'Failed to delete project: {str(e)}'}), 500
 
 
 # ============================================================================
