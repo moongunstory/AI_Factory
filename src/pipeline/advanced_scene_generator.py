@@ -185,9 +185,22 @@ Scene Duration Rules:
     },
     {
       "scene_number": 2,
-      "duration": 4.0,
-      "description": "The warrior enters the dark forest",
+      "duration": 2.5,
+      "description": "The warrior enters the dark forest cautiously",
       "prompt_en": "another detailed prompt"
+    },
+    {
+      "scene_number": 3,
+      "duration": 3.0,
+      "description": "Shadows move between the trees, watching him",
+      "prompt_en": "detailed prompt for scene 3"
+    },
+    ... (continue until scene 20-25 - you MUST include all scenes, do NOT stop at 2 or 3 scenes)
+    {
+      "scene_number": 23,
+      "duration": 4.0,
+      "description": "The warrior emerges victorious at dawn",
+      "prompt_en": "final detailed prompt"
     }
   ],
   "total_scenes": 23,
@@ -426,7 +439,7 @@ Create compelling, visually rich scenes that flow naturally like a single video.
                 prompt=user_prompt,
                 system_prompt=self.SCENE_GENERATION_SYSTEM_PROMPT,
                 temperature=temperature,
-                max_tokens=8192  # Increased from 4096 to support ~20 scenes
+                max_tokens=16384  # Increased to ensure 20-25 scenes can be fully generated
             )
 
             # Append global style to each prompt
