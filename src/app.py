@@ -34,73 +34,65 @@ if 'selected_scenes' not in st.session_state:
 
 # Header
 st.title("🎬 AI Short Factory")
-st.markdown("### 간단한 아이디어를 영상 프롬프트로 변환")
+st.markdown("### Turn a simple idea into cinematic prompts")
 st.markdown("---")
 
 # Get components
 components = get_components()
 
 # Step 1: Story Input
-st.header("1️⃣ 이야기 아이디어 입력")
+st.header("1️⃣ Enter your story idea")
 simple_idea = st.text_area(
-    "간단한 이야기 아이디어를 입력하세요:",
-    placeholder="예: 우주 정거장에서 깨어난 로봇이 인류의 마지막 메시지를 찾는 이야기",
+    "Write a simple story idea:",
+    placeholder="e.g., A robot wakes up on a space station and searches for humanity's last message",
     height=100
 )
 
 col1, col2 = st.columns([1, 5])
 with col1:
-    expand_button = st.button("🚀 이야기 확장", type="primary", disabled=not simple_idea)
+    expand_button = st.button("🚀 Expand story", type="primary", disabled=not simple_idea)
 
 # Step 2: Expanded Story Display
 if st.session_state.expanded_story:
-    st.header("2️⃣ 확장된 이야기")
+    st.header("2️⃣ Expanded story")
 
-    st.markdown("#### 📖 생성된 이야기")
+    st.markdown("#### 📖 Generated story")
     st.info(st.session_state.expanded_story)
 
     col1, col2 = st.columns([1, 1])
     with col1:
-        confirm_button = st.button("✅ 컨펌 (프롬프트 생성)", type="primary")
+        confirm_button = st.button("✅ Confirm (generate prompts)", type="primary")
     with col2:
-        retry_story_button = st.button("🔄 재시도 (이야기 다시 생성)")
+        retry_story_button = st.button("🔄 Retry (generate again)")
 
 # Step 3: Prompts Display
 if st.session_state.prompts_data:
-    st.header("3️⃣ 생성된 장면 프롬프트")
+    st.header("3️⃣ Generated scene prompts")
 
     scenes = st.session_state.prompts_data.get('scenes', [])
     total_scenes = len(scenes)
 
-    st.markdown(f"**총 {total_scenes}개 장면** | 예상 길이: {st.session_state.prompts_data.get('estimated_duration', 0):.1f}초")
+    st.markdown(f"**Total scenes: {total_scenes}** | Estimated length: {st.session_state.prompts_data.get('estimated_duration', 0):.1f}s")
     st.markdown("---")
 
     # Display each scene
     for scene in scenes:
         scene_num = scene.get('scene_number', 0)
 
-        with st.expander(f"🎬 장면 {scene_num} ({scene.get('duration', 0)}초)", expanded=True):
+        with st.expander(f"🎬 Scene {scene_num} ({scene.get('duration', 0)}s)", expanded=True):
             # Scene description
-            st.markdown(f"**장면 설명:** {scene.get('description_kr', 'N/A')}")
+            st.markdown(f"**Description:** {scene.get('description', 'N/A')}")
 
             # Prompts in columns
             col1, col2 = st.columns(2)
 
             with col1:
-                st.markdown("**📝 영어 프롬프트 (Stable Diffusion)**")
+                st.markdown("**📝 English prompt (Stable Diffusion)**")
                 st.code(scene.get('prompt_en', 'N/A'), language=None)
-
-            with col2:
-                st.markdown("**🇰🇷 한국어 번역**")
-                prompt_kr = scene.get('prompt_kr', '')
-                if not prompt_kr:
-                    st.caption("번역 중...")
-                else:
-                    st.code(prompt_kr, language=None)
 
             # Checkbox for regeneration
             is_selected = st.checkbox(
-                f"이 장면 재생성 선택",
+                f"Select this scene for regeneration",
                 key=f"select_{scene_num}",
                 value=scene_num in st.session_state.selected_scenes
             )
@@ -115,17 +107,17 @@ if st.session_state.prompts_data:
     if st.session_state.selected_scenes:
         selected_count = len(st.session_state.selected_scenes)
         regenerate_button = st.button(
-            f"🔄 선택한 {selected_count}개 장면 재생성",
+            f"🔄 Regenerate {selected_count} selected scenes",
             type="secondary"
         )
     else:
-        st.info("💡 재생성할 장면을 선택하려면 체크박스를 체크하세요.")
+        st.info("💡 Select scenes with the checkbox to regenerate them.")
 
 # Event Handlers
 
 # Expand story
 if expand_button:
-    with st.spinner("이야기를 확장하는 중... 🤖"):
+    with st.spinner("Expanding story... 🤖"):
         try:
             expanded = components['expander'].expand(simple_idea)
             st.session_state.expanded_story = expanded
@@ -133,12 +125,12 @@ if expand_button:
             st.session_state.selected_scenes = set()
             st.rerun()
         except Exception as e:
-            st.error(f"❌ 이야기 확장 실패: {e}")
+            st.error(f"❌ Story expansion failed: {e}")
             logger.error(f"Story expansion failed: {e}")
 
 # Retry story expansion
 if 'retry_story_button' in locals() and retry_story_button:
-    with st.spinner("이야기를 다시 생성하는 중... 🤖"):
+    with st.spinner("Regenerating story... 🤖"):
         try:
             expanded = components['expander'].expand(simple_idea)
             st.session_state.expanded_story = expanded
@@ -146,7 +138,7 @@ if 'retry_story_button' in locals() and retry_story_button:
             st.session_state.selected_scenes = set()
             st.rerun()
         except Exception as e:
-            st.error(f"❌ 이야기 재생성 실패: {e}")
+            st.error(f"❌ Story regeneration failed: {e}")
             logger.error(f"Story retry failed: {e}")
 
 # Confirm and generate prompts
@@ -155,10 +147,6 @@ if 'confirm_button' in locals() and confirm_button:
         try:
             # Generate prompts (English only)
             prompts_data = components['generator'].generate(st.session_state.expanded_story)
-
-            # Keep English only
-            for scene in prompts_data.get('scenes', []):
-                scene['prompt_kr'] = scene.get('prompt_en', '')
 
             st.session_state.prompts_data = prompts_data
             st.session_state.selected_scenes = set()
@@ -183,13 +171,12 @@ if 'regenerate_button' in locals() and regenerate_button:
 
                     new_scene = generator.regenerate_scene(
                         scene_number=scene_num,
-                        scene_description=scene.get('description_kr', '')
+                        scene_description=scene.get('description', '')
                     )
 
                     # Update the scene (English only)
                     scene['prompt_en'] = new_scene.get('prompt_en', '')
-                    scene['prompt_kr'] = scene['prompt_en']
-                    scene['description_kr'] = new_scene.get('description_kr', '')
+                    scene['description'] = new_scene.get('description', '')
                     scene['duration'] = new_scene.get('duration', scene.get('duration', 5.0))
 
             st.session_state.selected_scenes = set()

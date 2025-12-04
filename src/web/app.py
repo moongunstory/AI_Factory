@@ -37,7 +37,7 @@ logger = setup_logger(__name__)
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-app.config['JSON_AS_ASCII'] = False  # Support Korean characters
+app.config['JSON_AS_ASCII'] = False
 
 # Initialize AI components (singleton)
 components = None
@@ -183,10 +183,6 @@ def generate_prompts():
 
         # Format scenes for frontend (English only)
         scenes = scenes_result.get('scenes', [])
-        for scene in scenes:
-            # Keep all text in English
-            scene['description_kr'] = scene.get('description', '')
-            scene['prompt_kr'] = scene.get('prompt_en', '')
 
         # Prepare final prompts data
         prompts_data = {
@@ -246,9 +242,6 @@ def regenerate_scene():
             scene_description=scene_description
         )
 
-        # Keep English only
-        new_scene['prompt_kr'] = new_scene.get('prompt_en', '')
-
         return jsonify({
             'success': True,
             'scene': new_scene
@@ -293,10 +286,6 @@ def regenerate_scenes():
                 global_style=global_style,
                 temperature=0.7
             )
-
-            # Keep English only
-            new_scene['description_kr'] = new_scene.get('description', scene_description)
-            new_scene['prompt_kr'] = new_scene.get('prompt_en', '')
 
             regenerated_scenes.append(new_scene)
 
@@ -518,7 +507,7 @@ def list_universes():
 
     except Exception as e:
         logger.error(f"Failed to list universes: {e}")
-        return jsonify({'error': f'세계관 목록 조회 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Failed to fetch universe list: {str(e)}'}), 500
 
 
 @app.route('/api/universes', methods=['POST'])
@@ -534,7 +523,7 @@ def create_universe():
         style_lock = data.get('style_lock')
 
         if not all([universe_id, name, genre]):
-            return jsonify({'error': '필수 필드가 누락되었습니다'}), 400
+            return jsonify({'error': 'Required fields are missing'}), 400
 
         comp = get_components()
         universe = comp['universe_mgr'].create_universe(
@@ -548,7 +537,7 @@ def create_universe():
 
     except Exception as e:
         logger.error(f"Failed to create universe: {e}")
-        return jsonify({'error': f'세계관 생성 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Failed to create universe: {str(e)}'}), 500
 
 
 @app.route('/api/universes/<universe_id>', methods=['GET'])
@@ -559,7 +548,7 @@ def get_universe(universe_id):
         universe = comp['universe_mgr'].get_universe_summary(universe_id)
 
         if not universe:
-            return jsonify({'error': '세계관을 찾을 수 없습니다'}), 404
+            return jsonify({'error': 'Universe not found'}), 404
 
         return jsonify({
             'success': True,
@@ -568,7 +557,7 @@ def get_universe(universe_id):
 
     except Exception as e:
         logger.error(f"Failed to get universe: {e}")
-        return jsonify({'error': f'세계관 조회 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Failed to fetch universe: {str(e)}'}), 500
 
 
 # ============================================================================
@@ -591,7 +580,7 @@ def list_characters(universe_id):
 
     except Exception as e:
         logger.error(f"Failed to list characters: {e}")
-        return jsonify({'error': f'캐릭터 목록 조회 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Failed to fetch character list: {str(e)}'}), 500
 
 
 @app.route('/api/universes/<universe_id>/characters', methods=['POST'])
@@ -623,7 +612,7 @@ def create_character(universe_id):
 
     except Exception as e:
         logger.error(f"Failed to create character: {e}")
-        return jsonify({'error': f'캐릭터 생성 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Failed to create character: {str(e)}'}), 500
 
 
 # ============================================================================
@@ -644,7 +633,7 @@ def list_series(universe_id):
 
     except Exception as e:
         logger.error(f"Failed to list series: {e}")
-        return jsonify({'error': f'시리즈 목록 조회 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Failed to fetch series list: {str(e)}'}), 500
 
 
 @app.route('/api/universes/<universe_id>/series', methods=['POST'])
@@ -668,7 +657,7 @@ def create_series(universe_id):
 
     except Exception as e:
         logger.error(f"Failed to create series: {e}")
-        return jsonify({'error': f'시리즈 생성 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Failed to create series: {str(e)}'}), 500
 
 
 @app.route('/api/universes/<universe_id>/episodes', methods=['GET'])
@@ -687,7 +676,7 @@ def list_episodes(universe_id):
 
     except Exception as e:
         logger.error(f"Failed to list episodes: {e}")
-        return jsonify({'error': f'에피소드 목록 조회 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Failed to fetch episode list: {str(e)}'}), 500
 
 
 @app.route('/api/series/next-suggestions', methods=['POST'])
@@ -699,14 +688,14 @@ def get_next_episode_suggestions():
         series_id = data.get('series_id')
 
         if not all([universe_id, series_id]):
-            return jsonify({'error': '필수 필드가 누락되었습니다'}), 400
+            return jsonify({'error': 'Required fields are missing'}), 400
 
         comp = get_components()
 
         # Get universe info
         universe = comp['universe_mgr'].get_universe(universe_id)
         if not universe:
-            return jsonify({'error': '세계관을 찾을 수 없습니다'}), 404
+            return jsonify({'error': 'Universe not found'}), 404
 
         # Get latest episode
         latest_episode = comp['series_mgr'].get_latest_episode(universe_id, series_id)
@@ -730,7 +719,7 @@ def get_next_episode_suggestions():
         # Generate suggestions
         suggestions = comp['suggester'].suggest_next_episodes(
             universe_summary=universe['background'],
-            previous_episode_summary=previous_summary or "첫 에피소드",
+            previous_episode_summary=previous_summary or "First episode",
             character_summaries=character_summaries,
             timeline_summary=timeline_summary,
             genre=universe['genre']
@@ -743,7 +732,7 @@ def get_next_episode_suggestions():
 
     except Exception as e:
         logger.error(f"Failed to generate suggestions: {e}")
-        return jsonify({'error': f'다음 화 추천 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Failed to recommend next episode: {str(e)}'}), 500
 
 
 # ============================================================================
@@ -764,7 +753,7 @@ def get_timeline(universe_id):
 
     except Exception as e:
         logger.error(f"Failed to get timeline: {e}")
-        return jsonify({'error': f'타임라인 조회 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Failed to fetch timeline: {str(e)}'}), 500
 
 
 @app.route('/api/universes/<universe_id>/consistency-check', methods=['POST'])
@@ -791,7 +780,7 @@ def check_consistency(universe_id):
 
     except Exception as e:
         logger.error(f"Consistency check failed: {e}")
-        return jsonify({'error': f'일관성 체크 실패: {str(e)}'}), 500
+        return jsonify({'error': f'Consistency check failed: {str(e)}'}), 500
 
 
 # ============================================================================
@@ -953,6 +942,6 @@ if __name__ == '__main__':
         host='127.0.0.1',
         port=5000,
         debug=True,
-        threaded=False,  # 단일 사용자: 순차 처리로 충분
-        use_reloader=False  # llama-server와의 충돌 방지
+        threaded=False,  # single user: sequential handling is sufficient
+        use_reloader=False  # avoid conflicts with llama-server
     )

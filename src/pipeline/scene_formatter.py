@@ -19,77 +19,74 @@ class SceneFormatter:
 
         # Header
         output.append("=" * 80)
-        output.append("스토리 비디오 장면 생성 결과")
+        output.append("Story Video Scene Generation Results")
         output.append("=" * 80)
         output.append("")
 
         # Story Idea
-        output.append("[스토리 아이디어]")
+        output.append("[Story Idea]")
         output.append(result.get('story_idea', 'N/A'))
         output.append("")
-        output.append(f"테마: {result.get('theme', 'N/A')}")
+        output.append(f"Theme: {result.get('theme', 'N/A')}")
         output.append("")
 
         # Story Summary
         output.append("=" * 80)
-        output.append("[스토리 요약]")
+        output.append("[Story Summary]")
         output.append("=" * 80)
-        # Prefer Korean (_ko) field, fallback to non-suffixed field
-        output.append(result.get('story_summary_ko', result.get('story_summary', 'N/A')))
+        output.append(result.get('story_summary', 'N/A'))
         output.append("")
 
         # Story Beats
         output.append("=" * 80)
-        output.append("[스토리 비트]")
+        output.append("[Story Beats]")
         output.append("=" * 80)
         for beat in result.get('story_beats', []):
             beat_num = beat.get('beat_number', '?')
-            # Prefer Korean (_ko) field, fallback to non-suffixed field
-            description = beat.get('description_ko', beat.get('description', 'N/A'))
+            description = beat.get('description', 'N/A')
             function = beat.get('narrative_function', 'N/A')
             output.append(f"{beat_num}. {description}")
-            output.append(f"   기능: {function}")
+            output.append(f"   Function: {function}")
             output.append("")
 
         # Characters
         output.append("=" * 80)
-        output.append("[캐릭터]")
+        output.append("[Characters]")
         output.append("=" * 80)
         for char in result.get('characters', []):
-            # Prefer Korean (_ko) fields, fallback to non-suffixed fields
-            name = char.get('name_ko', char.get('name', 'N/A'))
+            name = char.get('name', 'N/A')
             role = char.get('role', 'N/A')
             output.append(f"● {name} ({role})")
-            output.append(f"  외형: {char.get('physical_ko', char.get('physical', 'N/A'))}")
-            output.append(f"  의상: {char.get('costume_ko', char.get('costume', 'N/A'))}")
-            output.append(f"  장비: {char.get('equipment_ko', char.get('equipment', 'N/A'))}")
-            output.append(f"  성격적 특징: {char.get('personality_visual_ko', char.get('personality_visual', 'N/A'))}")
-            output.append(f"  일관성 태그: {char.get('consistency_tags', 'N/A')}")
+            output.append(f"  Physical: {char.get('physical', 'N/A')}")
+            output.append(f"  Costume: {char.get('costume', 'N/A')}")
+            output.append(f"  Equipment: {char.get('equipment', 'N/A')}")
+            output.append(f"  Personality Visuals: {char.get('personality_visual', 'N/A')}")
+            output.append(f"  Consistency Tags: {char.get('consistency_tags', 'N/A')}")
             output.append("")
 
         # Global Visual Style
         output.append("=" * 80)
-        output.append("[글로벌 비주얼 스타일]")
+        output.append("[Global Visual Style]")
         output.append("=" * 80)
         style = result.get('global_visual_style', {})
-        output.append(f"테마: {style.get('theme_name', 'N/A')}")
-        output.append(f"색상 팔레트: {style.get('color_palette', 'N/A')}")
-        output.append(f"조명: {style.get('lighting', 'N/A')}")
-        output.append(f"카메라: {style.get('camera', 'N/A')}")
-        output.append(f"텍스처: {style.get('texture', 'N/A')}")
-        output.append(f"분위기: {style.get('atmosphere', 'N/A')}")
-        output.append(f"일관성 태그: {style.get('consistency_tags', 'N/A')}")
-        output.append(f"품질 태그: {style.get('quality_tags', 'N/A')}")
+        output.append(f"Theme: {style.get('theme_name', 'N/A')}")
+        output.append(f"Color Palette: {style.get('color_palette', 'N/A')}")
+        output.append(f"Lighting: {style.get('lighting', 'N/A')}")
+        output.append(f"Camera: {style.get('camera', 'N/A')}")
+        output.append(f"Texture: {style.get('texture', 'N/A')}")
+        output.append(f"Atmosphere: {style.get('atmosphere', 'N/A')}")
+        output.append(f"Consistency Tags: {style.get('consistency_tags', 'N/A')}")
+        output.append(f"Quality Tags: {style.get('quality_tags', 'N/A')}")
         output.append("")
 
         # Scenes
         output.append("=" * 80)
-        output.append("[장면]")
+        output.append("[Scenes]")
         output.append("=" * 80)
         total_scenes = result.get('total_scenes', 0)
         total_duration = result.get('total_duration', 0)
-        output.append(f"총 장면 수: {total_scenes}")
-        output.append(f"총 지속시간: {total_duration}초")
+        output.append(f"Total Scenes: {total_scenes}")
+        output.append(f"Total Duration: {total_duration} seconds")
         output.append("")
 
         for scene in result.get('scenes', []):
@@ -97,24 +94,20 @@ class SceneFormatter:
             duration = scene.get('duration', 0)
             description = scene.get('description', 'N/A')
             prompt_en = scene.get('prompt_en', 'N/A')
-            prompt_ko = scene.get('prompt_ko', 'N/A')
 
             output.append("-" * 80)
             output.append(f"Scene {scene_num}")
             output.append("-" * 80)
-            output.append(f"지속시간: {duration}초")
-            output.append(f"설명: {description}")
+            output.append(f"Duration: {duration} seconds")
+            output.append(f"Description: {description}")
             output.append("")
-            output.append("프롬프트 (영어):")
+            output.append("Prompt (English):")
             output.append(prompt_en)
-            output.append("")
-            output.append("프롬프트 (한국어):")
-            output.append(prompt_ko)
             output.append("")
 
         # Footer
         output.append("=" * 80)
-        output.append("생성 완료")
+        output.append("Generation Complete")
         output.append("=" * 80)
 
         return "\n".join(output)
@@ -132,67 +125,64 @@ class SceneFormatter:
         output = []
 
         # Header
-        output.append("# 스토리 비디오 장면 생성 결과")
+        output.append("# Story Video Scene Generation Results")
         output.append("")
 
         # Story Idea
-        output.append("## 스토리 아이디어")
+        output.append("## Story Idea")
         output.append(result.get('story_idea', 'N/A'))
         output.append("")
-        output.append(f"**테마:** {result.get('theme', 'N/A')}")
+        output.append(f"**Theme:** {result.get('theme', 'N/A')}")
         output.append("")
 
         # Story Summary
-        output.append("## 스토리 요약")
-        # Prefer Korean (_ko) field, fallback to non-suffixed field
-        output.append(result.get('story_summary_ko', result.get('story_summary', 'N/A')))
+        output.append("## Story Summary")
+        output.append(result.get('story_summary', 'N/A'))
         output.append("")
 
         # Story Beats
-        output.append("## 스토리 비트")
+        output.append("## Story Beats")
         for beat in result.get('story_beats', []):
             beat_num = beat.get('beat_number', '?')
-            # Prefer Korean (_ko) field, fallback to non-suffixed field
-            description = beat.get('description_ko', beat.get('description', 'N/A'))
+            description = beat.get('description', 'N/A')
             function = beat.get('narrative_function', 'N/A')
             output.append(f"{beat_num}. **{description}**")
-            output.append(f"   - 기능: *{function}*")
+            output.append(f"   - Function: *{function}*")
 
         output.append("")
 
         # Characters
-        output.append("## 캐릭터")
+        output.append("## Characters")
         for char in result.get('characters', []):
-            # Prefer Korean (_ko) fields, fallback to non-suffixed fields
-            name = char.get('name_ko', char.get('name', 'N/A'))
+            name = char.get('name', 'N/A')
             role = char.get('role', 'N/A')
             output.append(f"### {name} ({role})")
-            output.append(f"- **외형:** {char.get('physical_ko', char.get('physical', 'N/A'))}")
-            output.append(f"- **의상:** {char.get('costume_ko', char.get('costume', 'N/A'))}")
-            output.append(f"- **장비:** {char.get('equipment_ko', char.get('equipment', 'N/A'))}")
-            output.append(f"- **성격적 특징:** {char.get('personality_visual_ko', char.get('personality_visual', 'N/A'))}")
-            output.append(f"- **일관성 태그:** {char.get('consistency_tags', 'N/A')}")
+            output.append(f"- **Physical:** {char.get('physical', 'N/A')}")
+            output.append(f"- **Costume:** {char.get('costume', 'N/A')}")
+            output.append(f"- **Equipment:** {char.get('equipment', 'N/A')}")
+            output.append(f"- **Personality Visuals:** {char.get('personality_visual', 'N/A')}")
+            output.append(f"- **Consistency Tags:** {char.get('consistency_tags', 'N/A')}")
             output.append("")
 
         # Global Visual Style
-        output.append("## 글로벌 비주얼 스타일")
+        output.append("## Global Visual Style")
         style = result.get('global_visual_style', {})
-        output.append(f"- **테마:** {style.get('theme_name', 'N/A')}")
-        output.append(f"- **색상 팔레트:** {style.get('color_palette', 'N/A')}")
-        output.append(f"- **조명:** {style.get('lighting', 'N/A')}")
-        output.append(f"- **카메라:** {style.get('camera', 'N/A')}")
-        output.append(f"- **텍스처:** {style.get('texture', 'N/A')}")
-        output.append(f"- **분위기:** {style.get('atmosphere', 'N/A')}")
-        output.append(f"- **일관성 태그:** {style.get('consistency_tags', 'N/A')}")
-        output.append(f"- **품질 태그:** {style.get('quality_tags', 'N/A')}")
+        output.append(f"- **Theme:** {style.get('theme_name', 'N/A')}")
+        output.append(f"- **Color Palette:** {style.get('color_palette', 'N/A')}")
+        output.append(f"- **Lighting:** {style.get('lighting', 'N/A')}")
+        output.append(f"- **Camera:** {style.get('camera', 'N/A')}")
+        output.append(f"- **Texture:** {style.get('texture', 'N/A')}")
+        output.append(f"- **Atmosphere:** {style.get('atmosphere', 'N/A')}")
+        output.append(f"- **Consistency Tags:** {style.get('consistency_tags', 'N/A')}")
+        output.append(f"- **Quality Tags:** {style.get('quality_tags', 'N/A')}")
         output.append("")
 
         # Scenes
-        output.append("## 장면")
+        output.append("## Scenes")
         total_scenes = result.get('total_scenes', 0)
         total_duration = result.get('total_duration', 0)
-        output.append(f"**총 장면 수:** {total_scenes}  ")
-        output.append(f"**총 지속시간:** {total_duration}초")
+        output.append(f"**Total Scenes:** {total_scenes}  ")
+        output.append(f"**Total Duration:** {total_duration} seconds")
         output.append("")
 
         for scene in result.get('scenes', []):
@@ -200,21 +190,17 @@ class SceneFormatter:
             duration = scene.get('duration', 0)
             description = scene.get('description', 'N/A')
             prompt_en = scene.get('prompt_en', 'N/A')
-            prompt_ko = scene.get('prompt_ko', 'N/A')
 
             output.append(f"### Scene {scene_num}")
-            output.append(f"- **지속시간:** {duration}초")
-            output.append(f"- **설명:** {description}")
+            output.append(f"- **Duration:** {duration} seconds")
+            output.append(f"- **Description:** {description}")
             output.append("")
-            output.append("**프롬프트 (영어):**")
+            output.append("**Prompt (English):**")
             output.append(f"> {prompt_en}")
-            output.append("")
-            output.append("**프롬프트 (한국어):**")
-            output.append(f"> {prompt_ko}")
             output.append("")
 
         output.append("---")
-        output.append("*생성 완료*")
+        output.append("*Generation complete*")
 
         return "\n".join(output)
 
@@ -235,12 +221,12 @@ class SceneFormatter:
         num_beats = len(result.get('story_beats', []))
 
         return f"""
-장면 생성 완료!
+Scene generation complete!
 ────────────────────────────────────────
-테마: {theme}
-스토리 비트: {num_beats}개
-캐릭터: {num_characters}명
-생성된 장면: {total_scenes}개
-총 지속시간: {total_duration}초
+Theme: {theme}
+Story beats: {num_beats}
+Characters: {num_characters}
+Generated scenes: {total_scenes}
+Total duration: {total_duration} seconds
 ────────────────────────────────────────
 """

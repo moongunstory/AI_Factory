@@ -32,7 +32,7 @@ const AppState = {
     suggestions: []
 };
 
-// 탭 ID 정의 (상단 탭 UI용)
+// Tab IDs for top-level navigation
 const Tabs = {
     CINEMATIC_STORY: 'cinematic-story',
     TREND_MEME_META: 'trend-meme'
@@ -94,7 +94,7 @@ function hideLoading(loadingId) {
 // ============================================================================
 
 function initTabs() {
-    AppState.activeTab = Tabs.CINEMATIC_STORY; // 기본 탭은 기존 시네마틱/스토리 플로우
+    AppState.activeTab = Tabs.CINEMATIC_STORY; // Default tab is cinematic/story flow
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -103,7 +103,7 @@ function initTabs() {
         });
     });
 
-    // 키보드 단축키: 1/2로 탭 전환
+    // Keyboard shortcuts: switch tabs with 1/2
     document.addEventListener('keydown', (event) => {
         if (event.key === '1') {
             switchTab(Tabs.CINEMATIC_STORY);
@@ -146,7 +146,7 @@ function renderTabContent() {
         trendContent?.classList.remove('hidden');
         progressBar?.classList.add('hidden');
 
-        // 트렌드/밈 탭 초기 화면 표시
+        // Show initial view for trend/meme tab
         document.querySelectorAll('#tab-content-trend .step-section').forEach(section => {
             section.classList.remove('hidden');
         });
@@ -170,13 +170,13 @@ async function apiCall(url, method = 'GET', data = null) {
         const result = await response.json();
 
         if (!result.success) {
-            throw new Error(result.error || 'API 호출 실패');
+            throw new Error(result.error || 'API call failed');
         }
 
         return result;
     } catch (error) {
         console.error('API Error:', error);
-        alert(`오류: ${error.message}`);
+        alert(`Error: ${error.message}`);
         throw error;
     }
 }
@@ -214,7 +214,7 @@ function selectMode(mode) {
 }
 
 // ============================================================================
-// Trend · Meme Meta Mode (신규 탭)
+// Trend · Meme Meta Mode (new tab)
 // ============================================================================
 
 function initTrendMemeMode() {
@@ -229,20 +229,20 @@ function initTrendMemeMode() {
 }
 
 function handleTrendModeMenuSelection(source) {
-    // 선택된 메타 소스를 바탕으로 후속 흐름 연결
+    // Connect follow-up flow based on selected meta source
     runTrendMemeMode(source);
 }
 
 function runTrendMemeMode(source) {
-    // TODO: 여기서 최신 메타 자동 조사 로직을 연결합니다.
-    // - 실시간 피드/랭킹/커스텀 패턴별로 크롤링·API 연동 지점 추가
-    // - 밈 패턴 추출, 클립 구조 분석, 프롬프트 자동화 파이프라인 삽입
-    // - 반복 제작용 프리셋/템플릿 저장 및 불러오기 연계
+    // TODO: Wire in latest meta auto-research logic here.
+    // - Add crawl/API integration points per source.
+    // - Hook in meme pattern extraction, clip analysis, and prompt automation.
+    // - Connect preset/template storage for repeat production.
 
     const labelMap = {
-        'live_feed': '🕒 실시간 피드',
-        'ranking': '📊 랭킹 / 인기 탭',
-        'custom_pattern': '🧬 커스텀 패턴 프리셋'
+        'live_feed': '🕒 Live feed',
+        'ranking': '📊 Ranking / trending',
+        'custom_pattern': '🧬 Custom pattern preset'
     };
 
     const selectionText = labelMap[source] || source;
@@ -251,10 +251,10 @@ function runTrendMemeMode(source) {
     if (resultBox) {
         resultBox.classList.remove('hidden');
         resultBox.innerHTML = `
-            <strong>선택:</strong> ${selectionText}<br>
-            TODO: 메타 분석 및 밈 패턴 기반 프롬프트 생성 로직을 여기에 연결합니다.<br>
-            • 실시간/랭킹 신호 수집 → 포맷 분석 → 촬영/자막/오디오 프롬프트 추천<br>
-            • 반복 제작용 템플릿/프리셋 저장소와 연동 예정
+            <strong>Selection:</strong> ${selectionText}<br>
+            TODO: Connect meta analysis and meme-pattern prompt generation logic here.<br>
+            • Collect live/ranking signals → analyze formats → recommend shoot/subtitle/audio prompts<br>
+            • Planned: connect template/preset storage for repeat production
         `;
     }
 
@@ -270,7 +270,7 @@ async function loadUniverses() {
         const result = await apiCall('/api/universes');
         const select = document.getElementById('existing-universe-select');
 
-        select.innerHTML = '<option value="">세계관을 선택하세요</option>';
+        select.innerHTML = '<option value="">Select a universe</option>';
 
         result.universes.forEach(universe => {
             const option = document.createElement('option');
@@ -335,7 +335,7 @@ async function proceedFromSeriesSetup() {
         const styleLock = document.getElementById('new-universe-style-lock').checked;
 
         if (!name) {
-            alert('세계관 이름을 입력해주세요');
+            alert('Please enter a universe name');
             return;
         }
 
@@ -359,7 +359,7 @@ async function proceedFromSeriesSetup() {
         // Use existing universe
         const universeId = document.getElementById('existing-universe-select').value;
         if (!universeId) {
-            alert('세계관을 선택해주세요');
+            alert('Please select a universe');
             return;
         }
         AppState.universeId = universeId;
@@ -388,7 +388,7 @@ async function proceedFromSeriesSetup() {
     } else {
         const seriesId = document.getElementById('existing-series-select').value;
         if (!seriesId) {
-            alert('시리즈를 선택해주세요');
+            alert('Please select a series');
             return;
         }
         AppState.seriesId = seriesId;
@@ -440,7 +440,7 @@ function displaySuggestions(suggestions) {
             <span class="suggestion-type">${getSuggestionTypeLabel(suggestion.type)}</span>
             <div class="suggestion-title">${suggestion.title}</div>
             <div class="suggestion-idea">${suggestion.idea}</div>
-            <div class="suggestion-focus">초점: ${suggestion.focus}</div>
+            <div class="suggestion-focus">Focus: ${suggestion.focus}</div>
         `;
 
         card.addEventListener('click', () => {
@@ -453,11 +453,11 @@ function displaySuggestions(suggestions) {
 
 function getSuggestionTypeLabel(type) {
     const labels = {
-        'conflict': '갈등 중심',
-        'character': '캐릭터 성장',
-        'event': '사건 중심',
-        'emotion': '감정/관계',
-        'dark': '다크 루트'
+        'conflict': 'Conflict-driven',
+        'character': 'Character growth',
+        'event': 'Event-driven',
+        'emotion': 'Emotion/Relationship',
+        'dark': 'Dark route'
     };
     return labels[type] || type;
 }
@@ -510,7 +510,7 @@ function initStoryInput() {
 async function expandStory() {
     const storyIdea = document.getElementById('story-idea-input').value.trim();
     if (!storyIdea) {
-        alert('이야기 아이디어를 입력해주세요');
+        alert('Please enter a story idea');
         return;
     }
 
@@ -591,9 +591,9 @@ function displayExpandedStory() {
             charEl.innerHTML = `
                 <div class="character-name">${name}</div>
                 <span class="character-role">${char.role}</span>
-                <div class="character-detail"><strong>외형:</strong> ${physical}</div>
-                <div class="character-detail"><strong>복장:</strong> ${costume}</div>
-                ${equipment ? `<div class="character-detail"><strong>장비:</strong> ${equipment}</div>` : ''}
+                <div class="character-detail"><strong>Appearance:</strong> ${physical}</div>
+                <div class="character-detail"><strong>Costume:</strong> ${costume}</div>
+                ${equipment ? `<div class="character-detail"><strong>Equipment:</strong> ${equipment}</div>` : ''}
             `;
             charactersContainer.appendChild(charEl);
         });
@@ -634,19 +634,19 @@ function displayScenes() {
     // Summary
     const summary = document.getElementById('prompts-summary');
     summary.innerHTML = `
-        <h3>📊 프롬프트 생성 완료</h3>
+        <h3>📊 Prompt generation complete</h3>
         <div class="summary-stats">
             <div class="stat-item">
                 <div class="stat-value">${AppState.scenes.length}</div>
-                <div class="stat-label">총 장면 수</div>
+                <div class="stat-label">Total scenes</div>
             </div>
             <div class="stat-item">
-                <div class="stat-value">${Math.round(AppState.scenes.reduce((sum, s) => sum + (s.duration || 0), 0))}초</div>
-                <div class="stat-label">예상 길이</div>
+                <div class="stat-value">${Math.round(AppState.scenes.reduce((sum, s) => sum + (s.duration || 0), 0))}s</div>
+                <div class="stat-label">Estimated length</div>
             </div>
             <div class="stat-item">
                 <div class="stat-value">${AppState.characterSheets.characters.length}</div>
-                <div class="stat-label">등장 캐릭터</div>
+                <div class="stat-label">Characters</div>
             </div>
         </div>
     `;
@@ -662,7 +662,7 @@ function displayScenes() {
         sceneEl.innerHTML = `
             <div class="scene-header">
                 <div class="scene-title">${scene.scene_number}</div>
-                <span class="scene-duration">${scene.duration}초</span>
+                <span class="scene-duration">${scene.duration}s</span>
             </div>
             <div class="scene-prompt">
                 <div class="prompt-text">${scene.prompt_en}</div>
@@ -670,9 +670,9 @@ function displayScenes() {
             <div class="scene-actions">
                 <label>
                     <input type="checkbox" class="scene-checkbox" data-scene="${index}">
-                    <span>재생성 선택</span>
+                    <span>Select to regenerate</span>
                 </label>
-                <button class="btn btn-small btn-secondary" onclick="copyPrompt(${index})">복사</button>
+                <button class="btn btn-small btn-secondary" onclick="copyPrompt(${index})">Copy</button>
             </div>
         `;
         container.appendChild(sceneEl);
@@ -701,7 +701,7 @@ window.copyPrompt = function(index) {
     const text = scene.prompt_en;
 
     navigator.clipboard.writeText(text).then(() => {
-        alert('프롬프트가 복사되었습니다!');
+        alert('Prompt copied!');
     }).catch(err => {
         console.error('Copy failed:', err);
     });
@@ -716,11 +716,11 @@ function initPromptsDisplay() {
     });
 
     document.getElementById('save-and-finish-btn').addEventListener('click', () => {
-        alert('저장되었습니다! (실제 저장 기능은 백엔드 추가 필요)');
+        alert('Saved! (Implement persistence in backend to store data.)');
     });
 
     document.getElementById('start-new-btn').addEventListener('click', () => {
-        if (confirm('새 프로젝트를 시작하시겠습니까? 현재 작업이 저장되지 않을 수 있습니다.')) {
+        if (confirm('Start a new project? Current work may not be saved.')) {
             location.reload();
         }
     });
@@ -742,7 +742,7 @@ function initPromptsDisplay() {
             hideLoading('image-generation-loading');
         } catch (error) {
             hideLoading('image-generation-loading');
-            alert(`이미지 생성 실패: ${error.message}\n\nComfyUI 서버가 실행 중인지 확인해주세요.`);
+            alert(`Image generation failed: ${error.message}\n\nPlease ensure the ComfyUI server is running.`);
         }
     });
 
@@ -750,7 +750,7 @@ function initPromptsDisplay() {
     document.getElementById('regenerate-images-btn').addEventListener('click', async () => {
         const checked = document.querySelectorAll('.image-checkbox:checked');
         if (checked.length === 0) {
-            alert('재생성할 이미지를 선택해주세요.');
+            alert('Please select images to regenerate.');
             return;
         }
 
@@ -785,10 +785,10 @@ function initPromptsDisplay() {
 
             displayImages();
             hideLoading('image-regenerate-loading');
-            alert(`${result.images.length}개의 이미지가 재생성되었습니다!`);
+            alert(`${result.images.length}images were regenerated!`);
         } catch (error) {
             hideLoading('image-regenerate-loading');
-            alert(`이미지 재생성 실패: ${error.message}`);
+            alert(`Image regeneration failed: ${error.message}`);
         }
     });
 }
@@ -803,16 +803,16 @@ function displayImages() {
     const failedCount = AppState.generatedImages.length - successCount;
 
     summary.innerHTML = `
-        <h3>🎨 이미지 생성 완료</h3>
+        <h3>🎨 Image generation complete</h3>
         <div class="summary-stats">
             <div class="stat-item">
                 <div class="stat-value">${successCount}</div>
-                <div class="stat-label">생성 성공</div>
+                <div class="stat-label">Succeeded</div>
             </div>
             ${failedCount > 0 ? `
             <div class="stat-item">
                 <div class="stat-value">${failedCount}</div>
-                <div class="stat-label">생성 실패</div>
+                <div class="stat-label">Failed</div>
             </div>
             ` : ''}
         </div>
@@ -832,7 +832,7 @@ function displayImages() {
                     <div class="image-title">Scene ${image.scene_number}</div>
                     <label class="image-checkbox-label">
                         <input type="checkbox" class="image-checkbox" data-image="${index}">
-                        재생성
+                        Regenerate
                     </label>
                 </div>
                 <div class="image-preview">
@@ -850,12 +850,12 @@ function displayImages() {
                     <div class="image-title">Scene ${image.scene_number}</div>
                     <label class="image-checkbox-label">
                         <input type="checkbox" class="image-checkbox" data-image="${index}">
-                        재생성
+                        Regenerate
                     </label>
                 </div>
                 <div class="image-error">
                     <div class="error-icon">⚠️</div>
-                    <div class="error-message">${image.error || '이미지 생성 실패'}</div>
+                    <div class="error-message">${image.error || 'Image failed'}</div>
                 </div>
                 <div class="image-info">
                     <div class="image-description">${image.description || ''}</div>

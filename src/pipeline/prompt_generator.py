@@ -53,11 +53,12 @@ VALID Example (DO THIS):
 ✓ {"scenes":[{"scene_number":1,"description":"scene description","prompt_en":"prompt","duration":5.0}],"total_scenes":1,"estimated_duration":5.0}
 
 Content Guidelines:
-- Determine the optimal number of scenes (usually 8-15 for a 1-2 minute video)
-- Each scene should be 5-10 seconds
+- You MUST generate a comprehensive set of scenes: minimum 15 scenes, target 20-30 depending on story length
+- Never return fewer than 15 scenes; longer stories should lean toward 25-30 scenes
+- Scene durations should typically be 2-5 seconds each to allow 20+ scenes within a one-minute runtime
 - Prompts should be detailed and visually descriptive
 - Use cinematic and high-quality style tags
-- All text in English
+- All text must be English only—do not include Korean or any other language
 
 REMEMBER: Output ONLY the JSON object. Nothing else."""
 
