@@ -25,6 +25,8 @@ class Config:
     OUTPUT_DIR = ROOT_DIR / "output"
     CLIPS_DIR = OUTPUT_DIR / "clips"
     IMAGES_DIR = OUTPUT_DIR / "images"
+    VIDEO_SEGMENTS_DIR = OUTPUT_DIR / "video_segments"
+    FINAL_DIR = OUTPUT_DIR / "final"
     LOGS_DIR = OUTPUT_DIR / "logs"
     PROMPTS_DIR = OUTPUT_DIR / "prompts"
 
@@ -77,7 +79,8 @@ class Config:
     @classmethod
     def ensure_output_dirs(cls) -> None:
         """Create output directories if they don't exist."""
-        for dir_path in [cls.CLIPS_DIR, cls.IMAGES_DIR, cls.LOGS_DIR, cls.PROMPTS_DIR]:
+        for dir_path in [cls.CLIPS_DIR, cls.IMAGES_DIR, cls.VIDEO_SEGMENTS_DIR,
+                         cls.FINAL_DIR, cls.LOGS_DIR, cls.PROMPTS_DIR]:
             dir_path.mkdir(parents=True, exist_ok=True)
 
     @classmethod

@@ -90,9 +90,15 @@ Generate a complete breakdown in JSON format with:
      * Describe composition, lighting, mood, characters, environment
      * Be specific about camera angle and framing
      * Optimized for vertical 9:16 format (portrait)
-   - video_prompt: Camera motion and pacing for video generation (WAN2.2)
-     * Examples: "slow zoom in", "pan right", "static shot", "dolly forward"
-     * Include motion intensity: "subtle", "moderate", "dramatic"
+   - video_prompt: Comprehensive camera motion and cinematography for video generation (WAN2.2)
+     * MUST include ALL of the following elements:
+       - POV (Point of View): "first-person POV", "third-person medium shot", "third-person wide shot", "close-up", "extreme close-up"
+       - Camera Movement: "static shot", "slow zoom in", "zoom out", "pan left/right", "tilt up/down", "dolly forward/back", "handheld shake", "smooth tracking"
+       - Camera Style: "cinematic steady", "handheld documentary style", "gimbal smooth movement", "tripod locked"
+       - Motion Intensity: "subtle", "moderate", "dramatic", "intense"
+       - FOV (Field of View): "wide angle", "normal lens", "telephoto", "ultra-wide"
+     * Example: "third-person medium shot, slow zoom in, cinematic steady, moderate intensity, normal lens"
+     * Ensure camera work matches scene emotion and pacing
    - duration_sec: Duration in seconds (typically 2-3 sec per scene)
 
 CRITICAL SCENE GENERATION RULES:
