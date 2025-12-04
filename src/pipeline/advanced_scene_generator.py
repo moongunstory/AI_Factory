@@ -439,7 +439,7 @@ Create compelling, visually rich scenes that flow naturally like a single video.
                 prompt=user_prompt,
                 system_prompt=self.SCENE_GENERATION_SYSTEM_PROMPT,
                 temperature=temperature,
-                max_tokens=16384  # Increased to ensure 20-25 scenes can be fully generated
+                max_tokens=3072  # Balanced to fit within context window (4096) with prompt
             )
 
             # Append global style to each prompt

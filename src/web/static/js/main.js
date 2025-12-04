@@ -724,7 +724,182 @@ function initPromptsDisplay() {
             location.reload();
         }
     });
+
+    // Generate images button
+    document.getElementById('generate-images-btn').addEventListener('click', async () => {
+        try {
+            showLoading('image-generation-loading');
+
+            const result = await apiCall('/api/generate-images', 'POST', {
+                prompts_data: {
+                    scenes: AppState.scenes
+                }
+            });
+
+            AppState.generatedImages = result.images;
+            displayImages();
+
+            hideLoading('image-generation-loading');
+        } catch (error) {
+            hideLoading('image-generation-loading');
+            alert(`이미지 생성 실패: ${error.message}\n\nComfyUI 서버가 실행 중인지 확인해주세요.`);
+        }
+    });
+
+    // Regenerate images button
+    document.getElementById('regenerate-images-btn').addEventListener('click', async () => {
+        const checked = document.querySelectorAll('.image-checkbox:checked');
+        if (checked.length === 0) {
+            alert('재생성할 이미지를 선택해주세요.');
+            return;
+        }
+
+        const scenesToRegenerate = [];
+        checked.forEach(cb => {
+            const index = parseInt(cb.dataset.image);
+            const image = AppState.generatedImages[index];
+            scenesToRegenerate.push({
+                scene_number: image.scene_number,
+                prompt: image.prompt,
+                description: image.description,
+                duration: image.duration
+            });
+        });
+
+        try {
+            showLoading('image-regenerate-loading');
+
+            const result = await apiCall('/api/regenerate-images', 'POST', {
+                scenes: scenesToRegenerate
+            });
+
+            // Update images in AppState
+            result.images.forEach(newImage => {
+                const index = AppState.generatedImages.findIndex(
+                    img => img.scene_number === newImage.scene_number
+                );
+                if (index !== -1) {
+                    AppState.generatedImages[index] = newImage;
+                }
+            });
+
+            displayImages();
+            hideLoading('image-regenerate-loading');
+            alert(`${result.images.length}개의 이미지가 재생성되었습니다!`);
+        } catch (error) {
+            hideLoading('image-regenerate-loading');
+            alert(`이미지 재생성 실패: ${error.message}`);
+        }
+    });
 }
+
+function displayImages() {
+    const step4 = document.getElementById('step-4-images');
+    step4.classList.remove('hidden');
+
+    // Summary
+    const summary = document.getElementById('images-summary');
+    const successCount = AppState.generatedImages.filter(img => img.image_path).length;
+    const failedCount = AppState.generatedImages.length - successCount;
+
+    summary.innerHTML = `
+        <h3>🎨 이미지 생성 완료</h3>
+        <div class="summary-stats">
+            <div class="stat-item">
+                <div class="stat-value">${successCount}</div>
+                <div class="stat-label">생성 성공</div>
+            </div>
+            ${failedCount > 0 ? `
+            <div class="stat-item">
+                <div class="stat-value">${failedCount}</div>
+                <div class="stat-label">생성 실패</div>
+            </div>
+            ` : ''}
+        </div>
+    `;
+
+    // Images grid
+    const container = document.getElementById('images-container');
+    container.innerHTML = '';
+
+    AppState.generatedImages.forEach((image, index) => {
+        const imageEl = document.createElement('div');
+        imageEl.className = 'image-card';
+
+        if (image.image_path) {
+            imageEl.innerHTML = `
+                <div class="image-header">
+                    <div class="image-title">Scene ${image.scene_number}</div>
+                    <label class="image-checkbox-label">
+                        <input type="checkbox" class="image-checkbox" data-image="${index}">
+                        재생성
+                    </label>
+                </div>
+                <div class="image-preview">
+                    <img src="/${image.image_path}" alt="Scene ${image.scene_number}"
+                         onclick="openImageModal('${image.image_path}')">
+                </div>
+                <div class="image-info">
+                    <div class="image-description">${image.description || ''}</div>
+                    <div class="image-prompt">${image.prompt.substring(0, 100)}...</div>
+                </div>
+            `;
+        } else {
+            imageEl.innerHTML = `
+                <div class="image-header">
+                    <div class="image-title">Scene ${image.scene_number}</div>
+                    <label class="image-checkbox-label">
+                        <input type="checkbox" class="image-checkbox" data-image="${index}">
+                        재생성
+                    </label>
+                </div>
+                <div class="image-error">
+                    <div class="error-icon">⚠️</div>
+                    <div class="error-message">${image.error || '이미지 생성 실패'}</div>
+                </div>
+                <div class="image-info">
+                    <div class="image-description">${image.description || ''}</div>
+                </div>
+            `;
+        }
+
+        container.appendChild(imageEl);
+    });
+
+    // Enable regenerate button when checkboxes are selected
+    const checkboxes = document.querySelectorAll('.image-checkbox');
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateImageRegenerateButton);
+    });
+
+    // Scroll to images
+    step4.scrollIntoView({ behavior: 'smooth' });
+}
+
+function updateImageRegenerateButton() {
+    const checked = document.querySelectorAll('.image-checkbox:checked');
+    const controls = document.getElementById('image-regenerate-controls');
+
+    if (checked.length > 0) {
+        controls.classList.remove('hidden');
+    } else {
+        controls.classList.add('hidden');
+    }
+}
+
+window.openImageModal = function(imagePath) {
+    // Simple modal for full-size image viewing
+    const modal = document.createElement('div');
+    modal.className = 'image-modal';
+    modal.innerHTML = `
+        <div class="modal-backdrop" onclick="this.parentElement.remove()"></div>
+        <div class="modal-content">
+            <img src="/${imagePath}" alt="Full size image">
+            <button class="modal-close" onclick="this.parentElement.parentElement.remove()">✕</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+};
 
 // ============================================================================
 // Initialization

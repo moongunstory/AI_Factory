@@ -29,6 +29,8 @@ from src.web.services.pipeline import (
     check_engines_health,
     PipelineStatus,
 )
+from src.web.services.comfy_client import ComfyUIClient
+from src.common.config import Config
 
 logger = setup_logger(__name__)
 
@@ -306,6 +308,196 @@ def regenerate_scenes():
     except Exception as e:
         logger.error(f"Scenes regeneration failed: {e}")
         return jsonify({'error': f'Scenes regeneration failed: {str(e)}'}), 500
+
+
+@app.route('/api/generate-images', methods=['POST'])
+def generate_images():
+    """Generate images for all scenes using ComfyUI + SDXL."""
+    try:
+        data = request.get_json()
+        prompts_data = data.get('prompts_data')
+
+        if not prompts_data:
+            prompts_data = session.get('prompts_data')
+
+        if not prompts_data:
+            return jsonify({'error': 'No prompts data available'}), 400
+
+        scenes = prompts_data.get('scenes', [])
+        if not scenes:
+            return jsonify({'error': 'No scenes to generate images for'}), 400
+
+        logger.info(f"Generating images for {len(scenes)} scenes...")
+
+        # Initialize ComfyUI client
+        comfy_client = ComfyUIClient(
+            server_url=Config.COMFYUI_URL,
+            model_base=Config.SDXL_BASE_MODEL,
+            model_refiner=Config.SDXL_REFINER_MODEL
+        )
+
+        # Check ComfyUI health
+        if not comfy_client.is_healthy():
+            return jsonify({'error': 'ComfyUI server is not running. Please start ComfyUI first.'}), 500
+
+        # Create output directory
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        images_dir = Config.IMAGES_DIR / timestamp
+        images_dir.mkdir(parents=True, exist_ok=True)
+
+        generated_images = []
+
+        for i, scene in enumerate(scenes, 1):
+            scene_number = scene.get('scene_number', i)
+            prompt = scene.get('prompt_en', '')
+
+            if not prompt:
+                logger.warning(f"Scene {scene_number} has no prompt, skipping")
+                continue
+
+            logger.info(f"Generating image {i}/{len(scenes)}: Scene {scene_number}...")
+
+            image_path = images_dir / f"scene_{scene_number:03d}.png"
+
+            try:
+                metadata = comfy_client.generate_vertical_image(
+                    prompt=prompt,
+                    out_path=image_path,
+                    steps_base=25,
+                    steps_refiner=15,
+                    cfg=7.0
+                )
+
+                # Store relative path for frontend
+                relative_path = str(image_path.relative_to(project_root))
+
+                generated_images.append({
+                    'scene_number': scene_number,
+                    'image_path': relative_path,
+                    'prompt': prompt,
+                    'description': scene.get('description', ''),
+                    'duration': scene.get('duration', 3.0)
+                })
+
+                logger.info(f"✓ Image {i}/{len(scenes)} generated: {image_path.name}")
+
+            except Exception as e:
+                logger.error(f"Failed to generate image for scene {scene_number}: {e}")
+                generated_images.append({
+                    'scene_number': scene_number,
+                    'image_path': None,
+                    'prompt': prompt,
+                    'description': scene.get('description', ''),
+                    'duration': scene.get('duration', 3.0),
+                    'error': str(e)
+                })
+
+        # Store generated images in session
+        session['generated_images'] = generated_images
+        session['images_timestamp'] = timestamp
+
+        logger.info(f"Generated {len([img for img in generated_images if img['image_path']])} images successfully")
+
+        return jsonify({
+            'success': True,
+            'images': generated_images,
+            'timestamp': timestamp
+        })
+
+    except Exception as e:
+        logger.error(f"Image generation failed: {e}")
+        return jsonify({'error': f'Image generation failed: {str(e)}'}), 500
+
+
+@app.route('/api/regenerate-images', methods=['POST'])
+def regenerate_images():
+    """Regenerate images for selected scenes."""
+    try:
+        data = request.get_json()
+        scenes_to_regenerate = data.get('scenes', [])
+
+        if not scenes_to_regenerate:
+            return jsonify({'error': 'No scenes to regenerate'}), 400
+
+        logger.info(f"Regenerating images for {len(scenes_to_regenerate)} scenes...")
+
+        # Initialize ComfyUI client
+        comfy_client = ComfyUIClient(
+            server_url=Config.COMFYUI_URL,
+            model_base=Config.SDXL_BASE_MODEL,
+            model_refiner=Config.SDXL_REFINER_MODEL
+        )
+
+        # Check ComfyUI health
+        if not comfy_client.is_healthy():
+            return jsonify({'error': 'ComfyUI server is not running. Please start ComfyUI first.'}), 500
+
+        # Get timestamp from session or create new
+        timestamp = session.get('images_timestamp')
+        if not timestamp:
+            from datetime import datetime
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            session['images_timestamp'] = timestamp
+
+        images_dir = Config.IMAGES_DIR / timestamp
+        images_dir.mkdir(parents=True, exist_ok=True)
+
+        regenerated_images = []
+
+        for scene_info in scenes_to_regenerate:
+            scene_number = scene_info.get('scene_number')
+            prompt = scene_info.get('prompt', '')
+
+            if not prompt:
+                logger.warning(f"Scene {scene_number} has no prompt, skipping")
+                continue
+
+            logger.info(f"Regenerating image for scene {scene_number}...")
+
+            image_path = images_dir / f"scene_{scene_number:03d}.png"
+
+            try:
+                metadata = comfy_client.generate_vertical_image(
+                    prompt=prompt,
+                    out_path=image_path,
+                    steps_base=25,
+                    steps_refiner=15,
+                    cfg=7.0
+                )
+
+                # Store relative path for frontend
+                relative_path = str(image_path.relative_to(project_root))
+
+                regenerated_images.append({
+                    'scene_number': scene_number,
+                    'image_path': relative_path,
+                    'prompt': prompt,
+                    'description': scene_info.get('description', ''),
+                    'duration': scene_info.get('duration', 3.0)
+                })
+
+                logger.info(f"✓ Image regenerated for scene {scene_number}")
+
+            except Exception as e:
+                logger.error(f"Failed to regenerate image for scene {scene_number}: {e}")
+                regenerated_images.append({
+                    'scene_number': scene_number,
+                    'image_path': None,
+                    'prompt': prompt,
+                    'description': scene_info.get('description', ''),
+                    'duration': scene_info.get('duration', 3.0),
+                    'error': str(e)
+                })
+
+        return jsonify({
+            'success': True,
+            'images': regenerated_images
+        })
+
+    except Exception as e:
+        logger.error(f"Image regeneration failed: {e}")
+        return jsonify({'error': f'Image regeneration failed: {str(e)}'}), 500
 
 
 # ============================================================================
