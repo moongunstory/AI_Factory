@@ -127,7 +127,7 @@ CRITICAL RULES:
 Guidelines:
 - Identify 2-4 main characters from the story
 - Be VERY specific and detailed
-- All descriptions MUST be in both Korean (ko) and English (en)
+- All descriptions MUST be in English only (no Korean or other languages)
 - Include elements that ensure visual consistency
 - Focus on visually distinctive features
 - Add consistency tags for Stable Diffusion
@@ -525,9 +525,7 @@ Create compelling, visually rich scenes that flow naturally like a single video.
                 "story_idea": story_idea,
                 "theme": theme,
                 "expanded_story": expanded_story,
-                "story_summary_ko": story_beats.get('story_summary_ko', ''),
-                "story_summary_en": story_beats.get('story_summary_en', ''),
-                "story_summary": story_beats.get('story_summary_ko', story_beats.get('story_summary', '')),  # For backward compatibility
+                "story_summary": story_beats.get('story_summary', ''),
                 "story_beats": story_beats.get('beats', []),
                 "characters": character_sheets.get('characters', []),
                 "global_visual_style": {
