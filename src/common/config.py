@@ -33,6 +33,26 @@ class Config:
     COMFYUI_PORT = int(os.getenv("COMFYUI_PORT", "8188"))
     COMFYUI_URL = f"http://{COMFYUI_HOST}:{COMFYUI_PORT}"
 
+    # ComfyUI VRAM optimization settings
+    COMFYUI_LOW_VRAM = os.getenv("COMFYUI_LOW_VRAM", "true").lower() == "true"
+    COMFYUI_USE_REFINER = os.getenv("COMFYUI_USE_REFINER", "false").lower() == "true"  # Refiner는 기본적으로 비활성화
+    COMFYUI_RESOLUTION_MODE = os.getenv("COMFYUI_RESOLUTION_MODE", "low")  # "low" (768px) or "high" (1080px)
+    COMFYUI_TIMEOUT = int(os.getenv("COMFYUI_TIMEOUT", "240"))  # 240초 (4분)
+    COMFYUI_MAX_RETRIES = int(os.getenv("COMFYUI_MAX_RETRIES", "2"))  # 최대 재시도 횟수
+
+    # Image generation parameters (optimized for stability)
+    IMAGE_STEPS_MIN = int(os.getenv("IMAGE_STEPS_MIN", "28"))
+    IMAGE_STEPS_MAX = int(os.getenv("IMAGE_STEPS_MAX", "32"))
+    IMAGE_CFG_MIN = float(os.getenv("IMAGE_CFG_MIN", "5.5"))
+    IMAGE_CFG_MAX = float(os.getenv("IMAGE_CFG_MAX", "6.2"))
+    IMAGE_REFINER_STEPS = int(os.getenv("IMAGE_REFINER_STEPS", "15"))  # Refiner 사용 시
+
+    # Resolution settings
+    IMAGE_WIDTH_LOW = int(os.getenv("IMAGE_WIDTH_LOW", "768"))
+    IMAGE_HEIGHT_LOW = int(os.getenv("IMAGE_HEIGHT_LOW", "1365"))  # 16:9 비율 유지
+    IMAGE_WIDTH_HIGH = int(os.getenv("IMAGE_WIDTH_HIGH", "1080"))
+    IMAGE_HEIGHT_HIGH = int(os.getenv("IMAGE_HEIGHT_HIGH", "1920"))
+
     # llama-server configuration
     LLAMA_SERVER_HOST = os.getenv("LLAMA_SERVER_HOST", "127.0.0.1")
     LLAMA_SERVER_PORT = int(os.getenv("LLAMA_SERVER_PORT", "8080"))

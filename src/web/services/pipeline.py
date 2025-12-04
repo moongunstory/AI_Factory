@@ -150,11 +150,29 @@ def generate_short(
         # ====================================================================
         update_state(PipelineStatus.GENERATING_IMAGES, 20, "Generating images...")
 
-        comfy_client = ComfyUIClient()
+        # Initialize ComfyUI client with optimized settings
+        comfy_client = ComfyUIClient(
+            low_vram_mode=Config.COMFYUI_LOW_VRAM,
+            use_refiner=Config.COMFYUI_USE_REFINER,
+            timeout=Config.COMFYUI_TIMEOUT,
+            max_retries=Config.COMFYUI_MAX_RETRIES,
+        )
 
+        # Determine which scenes need refiner (e.g., first, middle, last)
+        total_scenes = len(story_data["scenes"])
+        refiner_scenes = set()
+        if Config.COMFYUI_USE_REFINER and total_scenes > 3:
+            # Apply refiner to key scenes only (first, middle, last)
+            refiner_scenes.add(0)  # First scene
+            refiner_scenes.add(total_scenes // 2)  # Middle scene
+            refiner_scenes.add(total_scenes - 1)  # Last scene
+            logger.info(f"Refiner will be applied to {len(refiner_scenes)} key scenes: {sorted(refiner_scenes)}")
+
+        # IMPORTANT: Sequential generation only (no parallel processing)
         for i, scene in enumerate(story_data["scenes"], 1):
             scene_id = scene["id"]
             image_prompt = scene["image_prompt"]
+            use_refiner_for_scene = (i - 1) in refiner_scenes
 
             scene_info = {
                 "id": scene_id,
@@ -176,19 +194,28 @@ def generate_short(
             image_path = images_dir / f"scene_{scene_id:03d}.png"
 
             try:
+                # Generate with optimized parameters (auto-adjusted steps/cfg, low resolution)
                 metadata = comfy_client.generate_vertical_image(
                     prompt=image_prompt,
                     out_path=image_path,
-                    steps_base=25,
-                    steps_refiner=15,
-                    cfg=7.0,
+                    # steps_base, cfg will be auto-optimized based on Config
+                    use_refiner=use_refiner_for_scene,
+                    resolution_mode=Config.COMFYUI_RESOLUTION_MODE,
                 )
                 scene_info["image_path"] = str(image_path.relative_to(project_root))
                 logger.info(f"✓ Image {i}/{len(story_data['scenes'])} generated: {image_path.name}")
 
+                # CRITICAL: Clean up VRAM after each generation
+                comfy_client.cleanup_memory()
+
             except Exception as e:
                 logger.error(f"Failed to generate image for scene {scene_id}: {e}")
                 scene_info["image_path"] = None
+                # Clean up memory even on failure
+                try:
+                    comfy_client.cleanup_memory()
+                except:
+                    pass
                 # Continue with other scenes
 
             state["scenes"].append(scene_info)
