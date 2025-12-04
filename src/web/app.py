@@ -12,6 +12,7 @@ sys.path.insert(0, str(project_root))
 
 from src.pipeline.story_expander import StoryExpander
 from src.pipeline.prompt_generator import PromptGenerator
+from src.pipeline.character_extractor import CharacterExtractor
 from src.pipeline.visual_styles import VisualStyleDefinitions
 from src.pipeline.next_episode_suggester import NextEpisodeSuggester
 from src.data.universe_manager import UniverseManager
@@ -52,6 +53,7 @@ def get_components():
         components = {
             'expander': StoryExpander(),
             'generator': PromptGenerator(),
+            'character_extractor': CharacterExtractor(),
             'suggester': NextEpisodeSuggester(),
             'universe_mgr': UniverseManager(data_root),
             'character_mgr': CharacterManager(data_root),
@@ -154,6 +156,7 @@ def generate_prompts():
 
         comp = get_components()
         generator = comp['generator']  # Use PromptGenerator (multi-step pipeline)
+        character_extractor = comp['character_extractor']  # CharacterExtractor
 
         # Generate scenes using the stable multi-step pipeline
         logger.info("Generating scenes using multi-step pipeline...")
@@ -161,6 +164,10 @@ def generate_prompts():
 
         # Extract scenes
         scenes = scenes_result.get('scenes', [])
+
+        # Extract characters from the story
+        logger.info("Extracting characters from story...")
+        character_sheets = character_extractor.extract(expanded_story, temperature=0.5)
 
         # Prepare final prompts data
         prompts_data = {
@@ -172,16 +179,16 @@ def generate_prompts():
         # Store in session for regeneration
         session['prompts_data'] = prompts_data
         session['theme'] = theme
-        # Note: story_beats and character_sheets not used by PromptGenerator
-        # These can be added later if needed
+        session['character_sheets'] = character_sheets
 
         logger.info(f"Generated {len(scenes)} scenes successfully")
+        logger.info(f"Extracted {len(character_sheets.get('characters', []))} characters")
 
         return jsonify({
             'success': True,
             'prompts_data': prompts_data,
             'story_beats': [],  # Empty for backwards compatibility
-            'character_sheets': {'characters': []}  # Empty for backwards compatibility
+            'character_sheets': character_sheets
         })
 
     except RuntimeError as e:
