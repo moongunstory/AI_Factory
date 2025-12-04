@@ -33,7 +33,7 @@ class ServerManager:
         self.pid_file = self.project_dir / "output" / "logs" / ".llama_server.pid"
         self.out_log_file = self.project_dir / "output" / "logs" / "llama_server.out.log"
         self.err_log_file = self.project_dir / "output" / "logs" / "llama_server.err.log"
-        self.model_path = self.project_dir / "models" / "solar-10.7b" / "solar-10.7b-instruct-v1.0.Q6_K.gguf"
+        self.model_path = self.project_dir / "models" / "llm" / "Meta-Llama-3.1-8B-Instruct-Q5_K_M" / "Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf"
         self.llama_server_exe = self.project_dir / "engine" / "llama.cpp" / "build" / "bin" / "Release" / "llama-server.exe"
 
         # Server config

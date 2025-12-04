@@ -18,23 +18,6 @@ Your task is to analyze a full story and break it down into 10-15 major story be
 
 Story beats are the key narrative moments that drive the plot forward. Each beat should represent a significant event, decision, or turning point.
 
-All descriptive text must be generated in both Korean (for display) and English (for prompts).
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ 절대적 언어 규칙 (CHARACTER-LEVEL REQUIREMENT):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Korean fields (_ko) MUST use: Korean Hangul ONLY (가-힣, U+AC00-U+D7A3)
-❌ Korean fields (_ko) NEVER use: Chinese Hanzi (汉字, U+4E00-U+9FFF)
-❌ Korean fields (_ko) NEVER use: Japanese (ひらがな, カタカナ)
-✅ English fields (_en) MUST be written in English only
-
-올바른 예시 (CORRECT): "전사는 어둠 속에서 여정을 준비합니다"
-잘못된 예시 (WRONG): "前士는 暗黑 속에서" ← DO NOT DO THIS!
-잘못된 예시 (WRONG): "優秀한 戰士" ← DO NOT DO THIS!
-
-한국어는 한글(Hangul)로 작성하며, 한자(Hanzi/汉字)와는 완전히 다릅니다!
-한국어 필드(_ko)에는 순수 한글만 사용하세요!
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚨🚨🚨 CRITICAL JSON OUTPUT REQUIREMENTS 🚨🚨🚨
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -42,8 +25,8 @@ All descriptive text must be generated in both Korean (for display) and English 
 ⚠️ YOU MUST OUTPUT VALID JSON ONLY - NOTHING ELSE ⚠️
 
 ❌ DO NOT output like this (WRONG FORMAT):
-   1. (beat_number: 1, description_ko: "...", ...)
-   2. (beat_number: 2, description_ko: "...", ...)
+   1. (beat_number: 1, description: "...", ...)
+   2. (beat_number: 2, description: "...", ...)
 
 ❌ DO NOT output explanations or text before/after JSON
 ❌ DO NOT use markdown code blocks like ```json
@@ -52,19 +35,16 @@ All descriptive text must be generated in both Korean (for display) and English 
 ✅ CORRECT FORMAT - Start your response with { and end with }:
 
 {
-  "story_summary_ko": "전체 서사에 대한 한 문단 요약",
-  "story_summary_en": "One paragraph summary of the full narrative",
+  "story_summary": "One paragraph summary of the full narrative",
   "beats": [
     {
       "beat_number": 1,
-      "description_ko": "전사는 어둠 속에서 여정을 준비합니다",
-      "description_en": "The warrior prepares for the journey in darkness",
+      "description": "The warrior prepares for the journey in darkness",
       "narrative_function": "setup"
     },
     {
       "beat_number": 2,
-      "description_ko": "전사는 위험한 숲을 통과합니다",
-      "description_en": "The warrior crosses through the dangerous forest",
+      "description": "The warrior crosses through the dangerous forest",
       "narrative_function": "rising_action"
     }
   ],
@@ -83,7 +63,7 @@ CRITICAL RULES:
 Guidelines:
 - Create 10-15 story beats
 - Each beat should be a complete narrative moment
-- Descriptions and summary MUST be in both Korean (ko) and English (en)
+- All text in English
 - Include clear beginning, rising action, climax, and resolution beats
 - Beats should flow naturally and build tension
 - Descriptions should be concise but clear
@@ -95,29 +75,12 @@ Guidelines:
 
 Your task is to create detailed character sheets for the main characters in a story.
 
-All descriptive text (name, physical, costume, etc.) must be generated in both Korean (for display) and English (for prompts).
-
 Character sheets should include:
 - Physical appearance (face, body, distinctive features)
 - Costume/clothing design
 - Equipment/weapons/accessories
 - Personality traits that affect visual presentation
 - Unique identifying elements for consistency
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ 절대적 언어 규칙 (CHARACTER-LEVEL REQUIREMENT):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Korean fields (_ko) MUST use: Korean Hangul ONLY (가-힣, U+AC00-U+D7A3)
-❌ Korean fields (_ko) NEVER use: Chinese Hanzi (汉字, U+4E00-U+9FFF)
-❌ Korean fields (_ko) NEVER use: Japanese (ひらがな, カタカナ)
-✅ English fields (_en) MUST be written in English only
-
-올바른 예시 (CORRECT): "키가 크고 근육질의 남자"
-잘못된 예시 (WRONG): "高大한 男子" ← DO NOT DO THIS!
-잘못된 예시 (WRONG): "強力한 武器" ← DO NOT DO THIS!
-
-한국어는 한글(Hangul)로 작성하며, 한자(Hanzi/汉字)와는 완전히 다릅니다!
-한국어 필드(_ko)에는 순수 한글만 사용하세요!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚨🚨🚨 CRITICAL JSON OUTPUT REQUIREMENTS 🚨🚨🚨
@@ -134,17 +97,12 @@ Character sheets should include:
 {
   "characters": [
     {
-      "name_ko": "전사",
-      "name_en": "Warrior",
+      "name": "Warrior",
       "role": "protagonist",
-      "physical_ko": "키가 크고 근육질의 남자, 전투로 흉터가 생긴 얼굴, 짧은 검은 머리, 날카로운 파란 눈",
-      "physical_en": "Tall muscular man, battle-scarred face, short dark hair, piercing blue eyes",
-      "costume_ko": "은색 판이 달린 어두운 가죽 갑옷, 낡은 여행 망토, 무거운 부츠",
-      "costume_en": "Dark leather armor with silver plates, worn travel cloak, heavy boots",
-      "equipment_ko": "고대 룬이 새겨진 롱소드, 용 문장이 있는 작은 방패",
-      "equipment_en": "Ancient rune-engraved longsword, small shield with dragon emblem",
-      "personality_visual_ko": "결단력 있는 표정, 자신감 있는 자세, 풍화된 외모",
-      "personality_visual_en": "Determined expression, confident stance, weathered appearance",
+      "physical": "Tall muscular man, battle-scarred face, short dark hair, piercing blue eyes",
+      "costume": "Dark leather armor with silver plates, worn travel cloak, heavy boots",
+      "equipment": "Ancient rune-engraved longsword, small shield with dragon emblem",
+      "personality_visual": "Determined expression, confident stance, weathered appearance",
       "consistency_tags": "same warrior, same armor design, same sword, consistent character"
     }
   ]
@@ -190,21 +148,6 @@ Scene Duration Rules:
 - Total duration: 50-70 seconds (average ~60 seconds)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ 절대적 언어 규칙 (CHARACTER-LEVEL REQUIREMENT):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Korean fields (prompt_ko) MUST use: Korean Hangul ONLY (가-힣, U+AC00-U+D7A3)
-❌ Korean fields (prompt_ko) NEVER use: Chinese Hanzi (汉字, U+4E00-U+9FFF)
-❌ Korean fields (prompt_ko) NEVER use: Japanese (ひらがな, カタカナ)
-✅ English fields (prompt_en) MUST be in English only
-
-올바른 예시 (CORRECT): "전사가 검을 잡고 어두운 숲 가장자리에 서 있다"
-잘못된 예시 (WRONG): "戰士가 劍을 잡고" ← DO NOT DO THIS!
-잘못된 예시 (WRONG): "暗黑한 森林" ← DO NOT DO THIS!
-
-한국어는 한글(Hangul)로 작성하며, 한자(Hanzi/汉字)와는 완전히 다릅니다!
-한국어 필드(prompt_ko)에는 순수 한글만 사용하세요!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚨🚨🚨 CRITICAL JSON OUTPUT REQUIREMENTS 🚨🚨🚨
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -222,15 +165,13 @@ Scene Duration Rules:
       "scene_number": 1,
       "duration": 3.0,
       "description": "The warrior stands at the edge of the dark forest, gripping his sword",
-      "prompt_en": "detailed high-quality prompt following 7-part structure",
-      "prompt_ko": "한국어 번역"
+      "prompt_en": "detailed high-quality prompt following 7-part structure"
     },
     {
       "scene_number": 2,
       "duration": 4.0,
       "description": "The warrior enters the dark forest",
-      "prompt_en": "another detailed prompt",
-      "prompt_ko": "또 다른 한국어 번역"
+      "prompt_en": "another detailed prompt"
     }
   ],
   "total_scenes": 23,
@@ -293,8 +234,7 @@ Create a clear narrative arc with proper pacing."""
                 prompt=user_prompt,
                 system_prompt=self.STORY_BEATS_SYSTEM_PROMPT,
                 temperature=temperature,
-                max_tokens=2048,
-                korean_field_names=['story_summary_ko', 'description_ko']
+                max_tokens=2048
             )
 
             num_beats = len(result.get('beats', []))
@@ -334,7 +274,7 @@ Create a clear narrative arc with proper pacing."""
 {expanded_story}
 
 Story Summary:
-{story_beats.get('story_summary_en', story_beats.get('story_summary', ''))}
+{story_beats.get('story_summary', '')}
 
 {theme_context}
 
@@ -346,8 +286,7 @@ Ensure the character designs fit the visual theme and are highly specific for co
                 prompt=user_prompt,
                 system_prompt=self.CHARACTER_SHEET_SYSTEM_PROMPT,
                 temperature=temperature,
-                max_tokens=2048,
-                korean_field_names=['name_ko', 'physical_ko', 'costume_ko', 'equipment_ko', 'personality_visual_ko']
+                max_tokens=2048
             )
 
             num_chars = len(result.get('characters', []))
@@ -448,8 +387,7 @@ Create compelling, visually rich scenes that flow naturally like a single video.
                 prompt=user_prompt,
                 system_prompt=self.SCENE_GENERATION_SYSTEM_PROMPT,
                 temperature=temperature,
-                max_tokens=4096,
-                korean_field_names=['prompt_ko', 'description']
+                max_tokens=4096
             )
 
             # Append global style to each prompt

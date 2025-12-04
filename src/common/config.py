@@ -17,7 +17,8 @@ class Config:
 
     # Model paths
     MODEL_DIR = ROOT_DIR / "models"
-    LLAMA_MODEL_PATH = MODEL_DIR / "solar-10.7b"
+    LLAMA_MODEL_PATH = MODEL_DIR / "llm" / "Meta-Llama-3.1-8B-Instruct-Q5_K_M"
+    TRANSLATION_MODEL_PATH = MODEL_DIR / "translate" / "nllb-200-distilled-600M"
 
     # Output paths
     OUTPUT_DIR = ROOT_DIR / "output"
@@ -38,15 +39,10 @@ class Config:
     LLAMA_N_GPU_LAYERS = int(os.getenv("LLAMA_N_GPU_LAYERS", "-1"))  # -1 = 모든 레이어를 GPU에 로드
 
     # LLM parameters (클라이언트 요청 시 사용)
-    LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.5"))  # 낮춤: 언어 순수성 향상
+    LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.7"))
     LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "2048"))  # 단일 요청 최대 토큰
-    LLM_TOP_P = float(os.getenv("LLM_TOP_P", "0.75"))  # 낮춤: 언어 혼용 감소
+    LLM_TOP_P = float(os.getenv("LLM_TOP_P", "0.9"))
     LLM_THREADS = int(os.getenv("LLM_THREADS", "4"))  # CPU 보조 스레드 (GPU 메인)
-
-    # 한국어 언어 검증 설정
-    ENFORCE_KOREAN_ONLY = os.getenv("ENFORCE_KOREAN_ONLY", "true").lower() == "true"
-    KOREAN_LANGUAGE_RETRIES = int(os.getenv("KOREAN_LANGUAGE_RETRIES", "3"))
-    KOREAN_VALIDATION_STRICT = os.getenv("KOREAN_VALIDATION_STRICT", "true").lower() == "true"
 
     # HTTP 요청 타임아웃 (초)
     LLM_REQUEST_TIMEOUT = int(os.getenv("LLM_REQUEST_TIMEOUT", "120"))  # 2분

@@ -1,74 +1,157 @@
-"""Translation module - translates English prompts to Korean."""
-from typing import Optional
-from ..generators.llm import LlamaClient
+"""Translation module - bidirectional translation between Korean and English using NLLB."""
+from typing import Optional, Literal
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+from ..common.config import Config
 from ..common.logger import setup_logger
 
 logger = setup_logger(__name__)
 
 
 class Translator:
-    """Translate English Stable Diffusion prompts to Korean."""
+    """Translate text between Korean and English using NLLB-200."""
 
-    SYSTEM_PROMPT = """You are a professional translator specializing in AI image generation prompts.
-
-Your task is to translate Stable Diffusion prompts from English to Korean while preserving their meaning and technical terms.
-
-Guidelines:
-- Translate the overall meaning and descriptions to Korean
-- Keep technical terms and style tags that are commonly used in English (like "4k", "masterpiece", "cinematic")
-- Make it readable and natural in Korean
-- Respond with ONLY the translated text, no additional explanations"""
-
-    def __init__(self, llm_client: Optional[LlamaClient] = None):
-        """Initialize the translator.
+    def __init__(self, model_path: Optional[Path] = None):
+        """Initialize the translator with NLLB model.
 
         Args:
-            llm_client: Optional LlamaClient instance. If None, creates a new one.
+            model_path: Optional path to NLLB model. If None, uses Config.TRANSLATION_MODEL_PATH.
         """
-        self.llm = llm_client or LlamaClient()
-        logger.info("Translator initialized")
+        self.model_path = model_path or Config.TRANSLATION_MODEL_PATH
+        self.model = None
+        self.tokenizer = None
+        self._load_model()
+        logger.info("Translator initialized with NLLB-200 model")
 
-    def translate(self, english_prompt: str, temperature: float = 0.3) -> str:
-        """Translate an English prompt to Korean.
-
-        Args:
-            english_prompt: English Stable Diffusion prompt
-            temperature: Sampling temperature (lower for more consistent translation)
-
-        Returns:
-            Translated prompt in Korean
-        """
-        logger.info(f"Translating prompt (length: {len(english_prompt)} chars)")
-
-        user_prompt = f"""English prompt: {english_prompt}
-
-Translate this to Korean while keeping technical terms and style tags."""
-
+    def _load_model(self):
+        """Load NLLB model and tokenizer."""
         try:
-            translated = self.llm.generate(
-                prompt=user_prompt,
-                system_prompt=self.SYSTEM_PROMPT,
-                temperature=temperature,
-                max_tokens=512,
+            logger.info(f"Loading NLLB model from {self.model_path}")
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                str(self.model_path),
+                local_files_only=True
+            )
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(
+                str(self.model_path),
+                local_files_only=True
             )
 
-            translated = translated.strip()
-            logger.info(f"Translation completed (output length: {len(translated)} chars)")
-            return translated
+            # Move to GPU if available
+            if torch.cuda.is_available():
+                self.model = self.model.cuda()
+                logger.info("NLLB model loaded on GPU")
+            else:
+                logger.info("NLLB model loaded on CPU")
 
         except Exception as e:
-            logger.error(f"Failed to translate: {e}")
+            logger.error(f"Failed to load NLLB model: {e}")
             raise
 
+    def translate(
+        self,
+        text: str,
+        source_lang: Literal["ko", "en"] = "en",
+        target_lang: Literal["ko", "en"] = "ko",
+        max_length: int = 512
+    ) -> str:
+        """Translate text between Korean and English.
 
-def translate_prompt(english_prompt: str) -> str:
-    """Convenience function to translate a prompt.
+        Args:
+            text: Text to translate
+            source_lang: Source language code ("ko" or "en")
+            target_lang: Target language code ("ko" or "en")
+            max_length: Maximum length of generated translation
+
+        Returns:
+            Translated text
+        """
+        if not text or not text.strip():
+            return ""
+
+        # Map language codes to NLLB format
+        lang_map = {
+            "ko": "kor_Hang",
+            "en": "eng_Latn"
+        }
+
+        src_lang = lang_map.get(source_lang, "eng_Latn")
+        tgt_lang = lang_map.get(target_lang, "kor_Hang")
+
+        try:
+            # Tokenize
+            self.tokenizer.src_lang = src_lang
+            inputs = self.tokenizer(
+                text,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=max_length
+            )
+
+            # Move to same device as model
+            if torch.cuda.is_available():
+                inputs = {k: v.cuda() for k, v in inputs.items()}
+
+            # Generate translation
+            translated_tokens = self.model.generate(
+                **inputs,
+                forced_bos_token_id=self.tokenizer.lang_code_to_id[tgt_lang],
+                max_length=max_length,
+                num_beams=5,
+                early_stopping=True
+            )
+
+            # Decode
+            translated_text = self.tokenizer.batch_decode(
+                translated_tokens,
+                skip_special_tokens=True
+            )[0]
+
+            logger.debug(f"Translated ({source_lang}→{target_lang}): {text[:50]}... → {translated_text[:50]}...")
+            return translated_text.strip()
+
+        except Exception as e:
+            logger.error(f"Translation failed: {e}")
+            raise
+
+    def korean_to_english(self, korean_text: str) -> str:
+        """Translate Korean text to English.
+
+        Args:
+            korean_text: Korean text to translate
+
+        Returns:
+            English translation
+        """
+        return self.translate(korean_text, source_lang="ko", target_lang="en")
+
+    def english_to_korean(self, english_text: str) -> str:
+        """Translate English text to Korean.
+
+        Args:
+            english_text: English text to translate
+
+        Returns:
+            Korean translation
+        """
+        return self.translate(english_text, source_lang="en", target_lang="ko")
+
+
+def translate_text(
+    text: str,
+    source_lang: Literal["ko", "en"] = "en",
+    target_lang: Literal["ko", "en"] = "ko"
+) -> str:
+    """Convenience function to translate text.
 
     Args:
-        english_prompt: English prompt
+        text: Text to translate
+        source_lang: Source language code
+        target_lang: Target language code
 
     Returns:
-        Korean translation
+        Translated text
     """
     translator = Translator()
-    return translator.translate(english_prompt)
+    return translator.translate(text, source_lang, target_lang)
