@@ -469,6 +469,372 @@ def regenerate_images():
 
 
 # ============================================================================
+# Video Generation APIs (WAN2.2)
+# ============================================================================
+
+@app.route('/api/generate-videos', methods=['POST'])
+def generate_videos():
+    """Generate videos from images using WAN2.2."""
+    try:
+        data = request.get_json()
+        video_requests = data.get('videos', [])
+
+        if not video_requests:
+            return jsonify({'error': 'No videos to generate'}), 400
+
+        logger.info(f"Generating videos for {len(video_requests)} scenes...")
+
+        # Initialize WAN2.2 client
+        from src.web.services.wan2_client import WAN2Client
+        wan2_client = WAN2Client()
+
+        # Create output directory
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        videos_dir = Config.VIDEO_SEGMENTS_DIR / timestamp
+        videos_dir.mkdir(parents=True, exist_ok=True)
+
+        generated_videos = []
+
+        for i, video_req in enumerate(video_requests, 1):
+            scene_number = video_req.get('scene_number')
+            image_path = project_root / video_req.get('image_path')
+            video_prompt = video_req.get('video_prompt', 'cinematic movement')
+            duration = video_req.get('duration', 2.5)
+
+            if not image_path.exists():
+                logger.warning(f"Image not found for scene {scene_number}: {image_path}")
+                generated_videos.append({
+                    'scene_number': scene_number,
+                    'video_path': None,
+                    'video_prompt': video_prompt,
+                    'duration': duration,
+                    'error': f'Image not found: {image_path}'
+                })
+                continue
+
+            logger.info(f"Generating video {i}/{len(video_requests)}: Scene {scene_number}...")
+
+            video_path = videos_dir / f"scene_{scene_number:03d}.mp4"
+
+            try:
+                wan2_client.generate_scene_video(
+                    image_path=image_path,
+                    prompt=video_prompt,
+                    out_path=video_path,
+                    duration_sec=duration,
+                    fps=24,
+                    motion_strength=0.7
+                )
+
+                # Store relative path for frontend
+                relative_path = str(video_path.relative_to(project_root))
+
+                generated_videos.append({
+                    'scene_number': scene_number,
+                    'video_path': relative_path,
+                    'video_prompt': video_prompt,
+                    'duration': duration
+                })
+
+                logger.info(f"✓ Video {i}/{len(video_requests)} generated: {video_path.name}")
+
+            except Exception as e:
+                logger.error(f"Failed to generate video for scene {scene_number}: {e}")
+                generated_videos.append({
+                    'scene_number': scene_number,
+                    'video_path': None,
+                    'video_prompt': video_prompt,
+                    'duration': duration,
+                    'error': str(e)
+                })
+
+        # Store generated videos in session
+        session['generated_videos'] = generated_videos
+        session['videos_timestamp'] = timestamp
+
+        success_count = len([v for v in generated_videos if v['video_path']])
+        logger.info(f"Generated {success_count}/{len(video_requests)} videos successfully")
+
+        return jsonify({
+            'success': True,
+            'videos': generated_videos,
+            'timestamp': timestamp
+        })
+
+    except Exception as e:
+        logger.error(f"Video generation failed: {e}")
+        return jsonify({'error': f'Video generation failed: {str(e)}'}), 500
+
+
+@app.route('/api/assemble-final-video', methods=['POST'])
+def assemble_final_video():
+    """Assemble final video with BGM and subtitles."""
+    try:
+        data = request.get_json()
+        videos = data.get('videos', [])
+        options = data.get('options', {})
+
+        if not videos:
+            return jsonify({'error': 'No videos to assemble'}), 400
+
+        logger.info(f"Assembling final video from {len(videos)} segments...")
+        logger.info(f"Options: {options}")
+
+        # Filter valid videos
+        valid_videos = [v for v in videos if v.get('video_path')]
+        if not valid_videos:
+            return jsonify({'error': 'No valid video segments found'}), 400
+
+        # Create output directory
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        final_dir = Config.FINAL_DIR / timestamp
+        final_dir.mkdir(parents=True, exist_ok=True)
+
+        # Prepare video paths
+        video_paths = [project_root / v['video_path'] for v in valid_videos]
+
+        # Generate output path
+        final_video_path = final_dir / "short_final.mp4"
+
+        # Use ffmpeg to concatenate videos
+        import subprocess
+        import tempfile
+
+        # Create concat file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as concat_file:
+            for video_path in video_paths:
+                # Use absolute paths and escape single quotes
+                abs_path = str(video_path.absolute()).replace("'", "'\\''")
+                concat_file.write(f"file '{abs_path}'\n")
+            concat_file_path = concat_file.name
+
+        try:
+            # Concatenate videos
+            cmd = [
+                'ffmpeg',
+                '-f', 'concat',
+                '-safe', '0',
+                '-i', concat_file_path,
+                '-c', 'copy',
+                '-y',
+                str(final_video_path)
+            ]
+
+            logger.info(f"Running ffmpeg concat: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+
+            if result.returncode != 0:
+                logger.error(f"ffmpeg concat failed: {result.stderr}")
+                raise RuntimeError(f"Video concatenation failed: {result.stderr}")
+
+            logger.info(f"✓ Videos concatenated successfully: {final_video_path}")
+
+            # TODO: Add BGM if requested
+            if options.get('add_bgm', False):
+                logger.info("BGM addition requested (not yet implemented)")
+                # Future: Add BGM using ffmpeg audio overlay
+
+            # TODO: Add subtitles if requested
+            if options.get('add_subtitles', False):
+                logger.info("Subtitle addition requested (not yet implemented)")
+                # Future: Generate subtitles using story text and add with ffmpeg
+
+            # Calculate total duration
+            total_duration = sum(v.get('duration', 2.5) for v in valid_videos)
+
+            # Get video info
+            probe_cmd = [
+                'ffprobe',
+                '-v', 'error',
+                '-select_streams', 'v:0',
+                '-show_entries', 'stream=width,height',
+                '-of', 'csv=p=0',
+                str(final_video_path)
+            ]
+            probe_result = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=10)
+            resolution = probe_result.stdout.strip() if probe_result.returncode == 0 else '768x1365'
+
+            # Store relative path for frontend
+            relative_path = str(final_video_path.relative_to(project_root))
+
+            # Store in session
+            session['final_video_path'] = relative_path
+            session['final_timestamp'] = timestamp
+
+            logger.info(f"Final video assembly complete: {relative_path}")
+
+            return jsonify({
+                'success': True,
+                'final_video_path': relative_path,
+                'duration': total_duration,
+                'resolution': resolution,
+                'timestamp': timestamp
+            })
+
+        finally:
+            # Clean up temp file
+            import os
+            try:
+                os.unlink(concat_file_path)
+            except:
+                pass
+
+    except Exception as e:
+        logger.error(f"Final video assembly failed: {e}")
+        return jsonify({'error': f'Final video assembly failed: {str(e)}'}), 500
+
+
+# ============================================================================
+# Project Save/Load APIs
+# ============================================================================
+
+@app.route('/api/save-project', methods=['POST'])
+def save_project():
+    """Save current project state."""
+    try:
+        data = request.get_json()
+        project_name = data.get('project_name', 'Untitled')
+
+        # Create project directory
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        project_id = f"{timestamp}_{project_name.replace(' ', '_')}"
+        project_dir = Config.OUTPUT_DIR / 'projects' / project_id
+        project_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save project data
+        import json
+
+        project_data = {
+            'project_id': project_id,
+            'project_name': project_name,
+            'created_at': timestamp,
+            'mode': session.get('mode'),
+            'theme': session.get('theme'),
+            'simple_idea': session.get('simple_idea'),
+            'expanded_story': session.get('expanded_story'),
+            'character_sheets': session.get('character_sheets'),
+            'prompts_data': session.get('prompts_data'),
+            'generated_images': session.get('generated_images'),
+            'generated_videos': session.get('generated_videos'),
+            'final_video_path': session.get('final_video_path'),
+            'images_timestamp': session.get('images_timestamp'),
+            'videos_timestamp': session.get('videos_timestamp'),
+            'final_timestamp': session.get('final_timestamp')
+        }
+
+        # Write to JSON file
+        project_file = project_dir / 'project.json'
+        with open(project_file, 'w', encoding='utf-8') as f:
+            json.dump(project_data, f, ensure_ascii=False, indent=2)
+
+        logger.info(f"Project saved: {project_id}")
+
+        return jsonify({
+            'success': True,
+            'project_id': project_id,
+            'project_path': str(project_dir.relative_to(project_root))
+        })
+
+    except Exception as e:
+        logger.error(f"Project save failed: {e}")
+        return jsonify({'error': f'Project save failed: {str(e)}'}), 500
+
+
+@app.route('/api/load-project', methods=['POST'])
+def load_project():
+    """Load a saved project."""
+    try:
+        data = request.get_json()
+        project_id = data.get('project_id')
+
+        if not project_id:
+            return jsonify({'error': 'Project ID is required'}), 400
+
+        project_dir = Config.OUTPUT_DIR / 'projects' / project_id
+        project_file = project_dir / 'project.json'
+
+        if not project_file.exists():
+            return jsonify({'error': 'Project not found'}), 404
+
+        # Load project data
+        import json
+        with open(project_file, 'r', encoding='utf-8') as f:
+            project_data = json.load(f)
+
+        # Restore session state
+        session['mode'] = project_data.get('mode')
+        session['theme'] = project_data.get('theme')
+        session['simple_idea'] = project_data.get('simple_idea')
+        session['expanded_story'] = project_data.get('expanded_story')
+        session['character_sheets'] = project_data.get('character_sheets')
+        session['prompts_data'] = project_data.get('prompts_data')
+        session['generated_images'] = project_data.get('generated_images')
+        session['generated_videos'] = project_data.get('generated_videos')
+        session['final_video_path'] = project_data.get('final_video_path')
+        session['images_timestamp'] = project_data.get('images_timestamp')
+        session['videos_timestamp'] = project_data.get('videos_timestamp')
+        session['final_timestamp'] = project_data.get('final_timestamp')
+
+        logger.info(f"Project loaded: {project_id}")
+
+        return jsonify({
+            'success': True,
+            'project_data': project_data
+        })
+
+    except Exception as e:
+        logger.error(f"Project load failed: {e}")
+        return jsonify({'error': f'Project load failed: {str(e)}'}), 500
+
+
+@app.route('/api/list-projects', methods=['GET'])
+def list_projects():
+    """List all saved projects."""
+    try:
+        projects_dir = Config.OUTPUT_DIR / 'projects'
+        if not projects_dir.exists():
+            return jsonify({
+                'success': True,
+                'projects': []
+            })
+
+        projects = []
+        import json
+
+        for project_dir in projects_dir.iterdir():
+            if project_dir.is_dir():
+                project_file = project_dir / 'project.json'
+                if project_file.exists():
+                    try:
+                        with open(project_file, 'r', encoding='utf-8') as f:
+                            project_data = json.load(f)
+                            projects.append({
+                                'project_id': project_data.get('project_id'),
+                                'project_name': project_data.get('project_name'),
+                                'created_at': project_data.get('created_at'),
+                                'mode': project_data.get('mode'),
+                                'theme': project_data.get('theme')
+                            })
+                    except Exception as e:
+                        logger.warning(f"Failed to load project {project_dir.name}: {e}")
+
+        # Sort by created_at descending
+        projects.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+
+        return jsonify({
+            'success': True,
+            'projects': projects
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to list projects: {e}")
+        return jsonify({'error': f'Failed to list projects: {str(e)}'}), 500
+
+
+# ============================================================================
 # Universe Management APIs
 # ============================================================================
 

@@ -27,6 +27,12 @@ const AppState = {
 
     // Generated data
     scenes: [],
+    generatedImages: [],
+    generatedVideos: [],
+
+    // Project ID for save/load
+    projectId: null,
+    projectPath: null,
 
     // Suggestions
     suggestions: []
@@ -872,6 +878,11 @@ function displayImages() {
         cb.addEventListener('change', updateImageRegenerateButton);
     });
 
+    // Show video generation button when all images are generated
+    if (successCount > 0) {
+        document.getElementById('start-video-generation-btn').classList.remove('hidden');
+    }
+
     // Scroll to images
     step4.scrollIntoView({ behavior: 'smooth' });
 }
@@ -902,6 +913,207 @@ window.openImageModal = function(imagePath) {
 };
 
 // ============================================================================
+// Step 4: Video Generation
+// ============================================================================
+
+function initVideoGeneration() {
+    document.getElementById('start-video-generation-btn').addEventListener('click', async () => {
+        await startVideoGeneration();
+    });
+
+    document.getElementById('video-back-btn').addEventListener('click', () => {
+        showSection('step-3-prompts');
+        updateProgressBar(3);
+    });
+
+    document.getElementById('proceed-to-assembly-btn').addEventListener('click', () => {
+        AppState.currentStep = 5;
+        showSection('step-5-final-assembly');
+        updateProgressBar(5);
+    });
+}
+
+async function startVideoGeneration() {
+    AppState.currentStep = 4;
+    showSection('step-4-video-generation');
+    updateProgressBar(4);
+
+    // Summary
+    const summary = document.getElementById('video-generation-summary');
+    summary.innerHTML = `
+        <h3>🎬 영상 생성 중</h3>
+        <div class="summary-stats">
+            <div class="stat-item">
+                <div class="stat-value">${AppState.generatedImages.filter(img => img.image_path).length}</div>
+                <div class="stat-label">생성할 영상</div>
+            </div>
+        </div>
+    `;
+
+    try {
+        // Call video generation API
+        const validImages = AppState.generatedImages.filter(img => img.image_path);
+        const videoRequests = validImages.map(img => ({
+            scene_number: img.scene_number,
+            image_path: img.image_path,
+            video_prompt: AppState.scenes.find(s => s.scene_number === img.scene_number)?.video_prompt || 'cinematic movement',
+            duration: img.duration || 2.5
+        }));
+
+        // Update progress
+        document.getElementById('video-progress-status').textContent = '영상 생성 중...';
+
+        const result = await apiCall('/api/generate-videos', 'POST', {
+            videos: videoRequests
+        });
+
+        AppState.generatedVideos = result.videos;
+        displayVideos();
+
+        // Show proceed button
+        document.getElementById('proceed-to-assembly-btn').classList.remove('hidden');
+
+    } catch (error) {
+        alert(`영상 생성 실패: ${error.message}\n\nWAN2.2 모델이 설치되어 있는지 확인하세요.`);
+        document.getElementById('video-progress-status').textContent = '영상 생성 실패';
+    }
+}
+
+function displayVideos() {
+    const container = document.getElementById('videos-container');
+    container.innerHTML = '';
+
+    const successCount = AppState.generatedVideos.filter(v => v.video_path).length;
+
+    // Update progress
+    document.getElementById('video-progress-status').textContent = `완료: ${successCount}/${AppState.generatedVideos.length}`;
+    const progress = (successCount / AppState.generatedVideos.length) * 100;
+    document.getElementById('video-progress-bar').style.width = `${progress}%`;
+
+    AppState.generatedVideos.forEach((video, index) => {
+        const videoEl = document.createElement('div');
+        videoEl.className = 'video-card';
+
+        if (video.video_path) {
+            videoEl.innerHTML = `
+                <div class="video-header">
+                    <div class="video-title">장면 ${video.scene_number}</div>
+                    <span class="video-duration">${video.duration}s</span>
+                </div>
+                <div class="video-preview">
+                    <video src="/${video.video_path}" controls></video>
+                </div>
+                <div class="video-info">
+                    <div class="video-prompt">${video.video_prompt || ''}</div>
+                </div>
+            `;
+        } else {
+            videoEl.innerHTML = `
+                <div class="video-header">
+                    <div class="video-title">장면 ${video.scene_number}</div>
+                </div>
+                <div class="video-error">
+                    <div class="error-icon">⚠️</div>
+                    <div class="error-message">${video.error || '영상 생성 실패'}</div>
+                </div>
+            `;
+        }
+
+        container.appendChild(videoEl);
+    });
+}
+
+// ============================================================================
+// Step 5: Final Assembly
+// ============================================================================
+
+function initFinalAssembly() {
+    // BGM checkbox toggle
+    document.getElementById('add-bgm').addEventListener('change', (e) => {
+        const bgmOptions = document.getElementById('bgm-options');
+        if (e.target.checked) {
+            bgmOptions.style.display = 'block';
+        } else {
+            bgmOptions.style.display = 'none';
+        }
+    });
+
+    // Subtitle checkbox toggle
+    document.getElementById('add-subtitles').addEventListener('change', (e) => {
+        const subtitleOptions = document.getElementById('subtitle-options');
+        if (e.target.checked) {
+            subtitleOptions.style.display = 'block';
+        } else {
+            subtitleOptions.style.display = 'none';
+        }
+    });
+
+    document.getElementById('start-assembly-btn').addEventListener('click', async () => {
+        await startFinalAssembly();
+    });
+
+    document.getElementById('assembly-back-btn').addEventListener('click', () => {
+        showSection('step-4-video-generation');
+        updateProgressBar(4);
+    });
+
+    document.getElementById('download-final-video-btn').addEventListener('click', () => {
+        const videoPath = document.getElementById('final-video-path').textContent;
+        window.open(`/${videoPath}`, '_blank');
+    });
+
+    document.getElementById('start-new-project-btn').addEventListener('click', () => {
+        if (confirm('새 프로젝트를 시작할까요?')) {
+            location.reload();
+        }
+    });
+}
+
+async function startFinalAssembly() {
+    showLoading('assembly-loading');
+    document.getElementById('assembly-progress').classList.remove('hidden');
+
+    const addBGM = document.getElementById('add-bgm').checked;
+    const bgmStyle = document.getElementById('bgm-select').value;
+    const addSubtitles = document.getElementById('add-subtitles').checked;
+    const subtitleStyle = document.getElementById('subtitle-style').value;
+
+    try {
+        const validVideos = AppState.generatedVideos.filter(v => v.video_path);
+
+        const result = await apiCall('/api/assemble-final-video', 'POST', {
+            videos: validVideos,
+            options: {
+                add_bgm: addBGM,
+                bgm_style: bgmStyle,
+                add_subtitles: addSubtitles,
+                subtitle_style: subtitleStyle,
+                theme: AppState.theme,
+                story: AppState.expandedStory
+            }
+        });
+
+        // Show final result
+        document.getElementById('final-video-result').classList.remove('hidden');
+        document.getElementById('final-video-player').src = `/${result.final_video_path}`;
+        document.getElementById('final-video-path').textContent = result.final_video_path;
+        document.getElementById('final-video-duration').textContent = `${result.duration}s`;
+        document.getElementById('final-video-resolution').textContent = result.resolution || '768x1365';
+
+        // Update progress
+        document.getElementById('assembly-progress-status').textContent = '완료!';
+        document.getElementById('assembly-progress-bar').style.width = '100%';
+
+        hideLoading('assembly-loading');
+
+    } catch (error) {
+        hideLoading('assembly-loading');
+        alert(`최종 합성 실패: ${error.message}`);
+        document.getElementById('assembly-progress-status').textContent = '합성 실패';
+    }
+}
+
+// ============================================================================
 // Initialization
 // ============================================================================
 
@@ -913,6 +1125,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initStoryInput();
     initStoryExpanded();
     initPromptsDisplay();
+    initVideoGeneration();
+    initFinalAssembly();
     initTrendMemeMode();
 
     // Show initial section
