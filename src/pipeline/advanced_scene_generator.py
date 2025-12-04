@@ -143,9 +143,11 @@ Each scene must follow this 7-part structure:
 
 Scene Duration Rules:
 - Action/combat/travel scenes: 2-3 seconds
-- Emotional/atmospheric scenes: 4-5 seconds
-- Climax/resolution scenes: 5-6 seconds
+- Emotional/atmospheric scenes: 3-4 seconds
+- Dialogue/conversation scenes: 2-3 seconds
+- Climax/resolution scenes: 4-5 seconds
 - Total duration: 50-70 seconds (average ~60 seconds)
+- Target: approximately 20 scenes (can be 15-25 based on story complexity)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚨🚨🚨 CRITICAL JSON OUTPUT REQUIREMENTS 🚨🚨🚨
@@ -188,13 +190,14 @@ CRITICAL RULES:
 7. Use proper JSON syntax: double quotes, commas, no trailing commas
 
 Critical Rules:
-- MUST generate exactly 20-25 scenes
-- Total duration MUST be 50-70 seconds
+- MUST generate approximately 20 scenes (can range from 15-25 based on story)
+- Total duration SHOULD be around 50-70 seconds
 - Each prompt must follow the 7-part structure
 - Character appearance must match the character sheet exactly
 - Visual style must remain consistent across all scenes
 - Never use generic or vague descriptions
 - Every scene must be distinct and cinematic
+- Prioritize scene quality and story flow over exact count
 
 🚨 REMEMBER: Your response must START with { and END with } - NOTHING ELSE! 🚨"""
 
@@ -368,17 +371,18 @@ Global Visual Style:
 {global_style}
 
 Target Duration: {target_duration} seconds
-Required Scenes: 20-25
+Target Scenes: approximately 20 (range: 15-25)
 
-Generate 20-25 cinematic scenes following these requirements:
-1. Expand the {len(story_beats.get('beats', []))} story beats into 20-25 detailed scenes
+Generate approximately 20 cinematic scenes following these requirements:
+1. Expand the {len(story_beats.get('beats', []))} story beats into detailed scenes (aim for ~20 scenes)
 2. Each scene must follow the 7-part prompt structure
 3. Character appearances must match the character sheets EXACTLY
 4. All scenes must maintain visual consistency
-5. Scene durations should follow the rules (action: 2-3s, emotional: 4-5s, climax: 5-6s)
-6. Total duration must be approximately {target_duration} seconds
+5. Scene durations should follow the rules (action: 2-3s, emotional: 3-4s, dialogue: 2-3s, climax: 4-5s)
+6. Total duration should be approximately {target_duration} seconds
 7. Every scene must be unique and cinematic
 8. The global visual style will be appended to each prompt automatically
+9. Adjust scene count based on story complexity (can be 15-25 scenes)
 
 Create compelling, visually rich scenes that flow naturally like a single video."""
 
@@ -387,7 +391,7 @@ Create compelling, visually rich scenes that flow naturally like a single video.
                 prompt=user_prompt,
                 system_prompt=self.SCENE_GENERATION_SYSTEM_PROMPT,
                 temperature=temperature,
-                max_tokens=4096
+                max_tokens=8192  # Increased from 4096 to support ~20 scenes
             )
 
             # Append global style to each prompt
