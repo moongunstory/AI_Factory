@@ -93,12 +93,13 @@ class Translator:
             if torch.cuda.is_available():
                 inputs = {k: v.cuda() for k, v in inputs.items()}
 
-            # Generate translation
+            # Generate translation with quality/speed optimization
             translated_tokens = self.model.generate(
                 **inputs,
                 forced_bos_token_id=self.tokenizer.lang_code_to_id[tgt_lang],
                 max_length=max_length,
-                num_beams=5,
+                num_beams=4,  # Quality/speed balance
+                no_repeat_ngram_size=3,  # Prevent repetition
                 early_stopping=True
             )
 
