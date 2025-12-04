@@ -135,20 +135,14 @@ mkdir models\llm\Meta-Llama-3.1-8B-Instruct-Q5_K_M
 
 ### 4. llama-server 관리
 
-llama-server는 run.bat 실행 시 자동으로 시작됩니다. 수동 관리도 가능합니다:
+llama-server는 run.bat 실행 시 자동으로 시작됩니다. 수동 관리는 `manage_server.py`를 사용하세요:
 
-```powershell
-# 서버 시작 (GPU 가속)
-powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action start
+```cmd
+# 서버 시작
+python src\manage_server.py start
 
-# 상태 확인
-powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action status
-
-# 서버 중지
-powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action stop
-
-# 서버 재시작
-powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action restart
+# 재시작
+python src\manage_server.py restart
 ```
 
 ### 5. 애플리케이션 실행
@@ -221,7 +215,7 @@ python -m src --list-themes
 
 ```bash
 # GPU 설정 (단일 사용자 로컬 환경 최적화)
-LLAMA_CTX_SIZE=4096              # 단일 요청 전체 컨텍스트
+LLAMA_CTX_SIZE=8192              # 단일 요청 전체 컨텍스트
 LLAMA_BATCH_SIZE=512             # 단일 요청 최적화 (메모리 효율)
 LLAMA_N_GPU_LAYERS=-1            # GPU 레이어 수 (-1 = 모두)
 LLAMA_N_PARALLEL=1               # 단일 슬롯만 사용 (강제)
@@ -239,7 +233,7 @@ LLAMA_SERVER_PORT=8080
 ### GPU 최적화 (Windows 11)
 
 **🚀 단일 사용자 로컬 환경 설정 (12GB+ VRAM):**
-- `LLAMA_CTX_SIZE=4096` - 단일 요청 전체 컨텍스트
+- `LLAMA_CTX_SIZE=8192` - 단일 요청 전체 컨텍스트
 - `LLAMA_BATCH_SIZE=512` - 단일 요청 최적화 (메모리 효율)
 - `LLAMA_N_GPU_LAYERS=-1` - 모든 레이어 GPU에
 - `LLAMA_N_PARALLEL=1` - 단일 슬롯만 사용
@@ -353,18 +347,12 @@ GPU 메모리 부족 시:
 
 ### llama-server 관리
 
-```powershell
+```cmd
 # 서버 시작
-powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action start
-
-# 서버 상태 확인
-powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action status
-
-# 서버 중지
-powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action stop
+python src\manage_server.py start
 
 # 서버 재시작
-powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action restart
+python src\manage_server.py restart
 ```
 
 ### Model not found

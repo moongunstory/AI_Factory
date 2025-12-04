@@ -39,7 +39,7 @@ class Config:
     LLAMA_SERVER_URL = f"http://{LLAMA_SERVER_HOST}:{LLAMA_SERVER_PORT}"
 
     # llama-server 최적화 파라미터 (단일 사용자 로컬 환경)
-    LLAMA_CTX_SIZE = int(os.getenv("LLAMA_CTX_SIZE", "4096"))  # 단일 요청 전체 컨텍스트
+    LLAMA_CTX_SIZE = int(os.getenv("LLAMA_CTX_SIZE", "8192"))  # 단일 요청 전체 컨텍스트 (increased for long prompts)
     LLAMA_BATCH_SIZE = int(os.getenv("LLAMA_BATCH_SIZE", "512"))  # 단일 요청 최적화 (메모리 효율)
     LLAMA_N_PARALLEL = 1  # 단일 슬롯 강제 (환경변수 무시)
     LLAMA_N_GPU_LAYERS = int(os.getenv("LLAMA_N_GPU_LAYERS", "-1"))  # -1 = 모든 레이어를 GPU에 로드

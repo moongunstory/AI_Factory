@@ -89,7 +89,7 @@ class ServerManager:
             "--host", self.server_host,
             "--port", str(self.server_port),
             "--model", str(self.model_path),
-            "--ctx-size", "4096",       # Full context for single request
+            "--ctx-size", "8192",       # Full context for single request (increased for long prompts)
             "--batch-size", "512",      # Optimized for single request (reduced from 2048)
             "--threads", "4",
             "--n-gpu-layers", "-1",     # Load all layers to GPU
