@@ -36,6 +36,7 @@ class ComfyUIManager:
         # ComfyUI paths
         self.comfyui_dir = self.project_dir / "engine" / "comfyui"
         self.comfyui_main = self.comfyui_dir / "main.py"
+        self.comfyui_venv_python = self.comfyui_dir / "venv" / "Scripts" / "python.exe"
 
         # Server config
         self.server_host = "127.0.0.1"
@@ -82,9 +83,17 @@ class ComfyUIManager:
             print("Please ensure ComfyUI is installed in engine/comfyui/")
             return
 
+        # Determine which Python to use: venv if available, otherwise current interpreter
+        if self.comfyui_venv_python.exists():
+            python_exe = str(self.comfyui_venv_python)
+            logger.info(f"Using ComfyUI venv Python: {python_exe}")
+        else:
+            python_exe = sys.executable
+            logger.warning(f"ComfyUI venv not found, using system Python: {python_exe}")
+
         # ComfyUI startup parameters
         params = [
-            sys.executable,  # Use current Python interpreter
+            python_exe,
             str(self.comfyui_main),
             "--listen", self.server_host,
             "--port", str(self.server_port),

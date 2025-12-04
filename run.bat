@@ -108,9 +108,4 @@ echo.
 echo [INFO] Flask has stopped.
 echo [INFO] Backend services (llama-server, ComfyUI) are still running.
 echo.
-echo [옵션] 백엔드 서비스 관리:
-echo   - 모두 종료: python src\manage_server.py stop all
-echo   - 상태 확인: python src\manage_server.py status
-echo   - 재시작: python src\manage_server.py restart all
-echo.
 pause
