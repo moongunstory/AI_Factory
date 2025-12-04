@@ -577,7 +577,13 @@
                         <option value="series">시리즈</option>
                         <option value="meme">메타</option>
                     </select>
-                    <span class="filter-hint">최신순 정렬 · 삭제 시 바로 제거됩니다.</span>
+                    <label for="project-sort-order">정렬:</label>
+                    <select id="project-sort-order" class="form-input">
+                        <option value="newest">최신순</option>
+                        <option value="oldest">오래된순</option>
+                        <option value="title">제목순</option>
+                    </select>
+                    <span class="filter-hint">필터 · 정렬을 조정하면 목록이 즉시 갱신됩니다.</span>
                 </div>
                 <div id="load-project-loading" class="loading">목록을 불러오는 중...</div>
                 <div id="project-list" class="project-list hidden"></div>
