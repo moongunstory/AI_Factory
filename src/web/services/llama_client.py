@@ -34,7 +34,7 @@ class LlamaStoryClient:
         self,
         theme: str,
         style: str = "cinematic",
-        scene_count: int = 4,
+        scene_count: int = 20,
         title_hint: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate a complete story breakdown with scenes.
@@ -48,7 +48,7 @@ class LlamaStoryClient:
         Args:
             theme: The theme/concept for the short (e.g., "space adventure")
             style: Visual style (e.g., "cinematic", "anime", "watercolor")
-            scene_count: Number of scenes to generate (default: 4)
+            scene_count: Number of scenes to generate (default: 20)
             title_hint: Optional title hint
 
         Returns:
@@ -82,7 +82,7 @@ Focus on strong visuals, clear scenes, and cinematic storytelling."""
 
 Generate a complete breakdown in JSON format with:
 1. A catchy title
-2. A brief synopsis (1-2 sentences)
+2. A brief synopsis with paragraph breaks (1-3 short paragraphs)
 3. Exactly {scene_count} scenes, each with:
    - Scene ID (1, 2, 3, ...)
    - Scene name (brief, 3-5 words)
@@ -95,11 +95,15 @@ Generate a complete breakdown in JSON format with:
      * Include motion intensity: "subtle", "moderate", "dramatic"
    - duration_sec: Duration in seconds (typically 2-3 sec per scene)
 
-IMPORTANT:
+CRITICAL SCENE GENERATION RULES:
+- You MUST create exactly {scene_count} distinct, detailed scenes
+- Each scene should represent a specific visual moment or action
+- Break down the story into granular moments (action changes, emotion shifts, scene transitions)
 - Each scene should be visually striking and work well in vertical (9:16) format
 - Total duration should be around 60 seconds
 - Image prompts should be detailed and specific
 - Video prompts should describe camera movement and pacing
+- DO NOT create fewer scenes than requested
 
 Return ONLY valid JSON with this exact structure:
 {{

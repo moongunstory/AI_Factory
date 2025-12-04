@@ -22,7 +22,25 @@ Guidelines:
 - Include atmospheric details, character emotions, and environmental descriptions
 - Write ENTIRELY in English
 
-Respond with ONLY the expanded story in English. No additional explanations or metadata."""
+CRITICAL - PARAGRAPH STRUCTURE REQUIREMENTS:
+- Divide the story into clear paragraphs (2-4 sentences per paragraph)
+- Add a blank line between paragraphs for readability
+- Create new paragraphs when there are changes in:
+  * Action or movement
+  * Emotion or mood
+  * Scene or background
+  * Character focus or perspective
+- Long sentences should be naturally broken into shorter, readable sentences
+- Each paragraph should represent a distinct moment or beat in the story
+
+Example structure:
+Paragraph 1: Opening scene (2-3 sentences)
+
+Paragraph 2: Character action or movement (2-4 sentences)
+
+Paragraph 3: Emotional shift or new development (2-3 sentences)
+
+Respond with ONLY the expanded story in English with proper paragraph breaks. No additional explanations or metadata."""
 
     def __init__(self, llm_client: Optional[LlamaClient] = None):
         """Initialize the story expander.
@@ -47,7 +65,14 @@ Respond with ONLY the expanded story in English. No additional explanations or m
 
         user_prompt = f"""Simple story idea: {simple_idea}
 
-Expand this into a compelling, detailed story in English. Create a rich narrative with vivid descriptions, multiple scenes, and emotional depth. The story should be substantial enough to generate 20+ visual scenes."""
+Expand this into a compelling, detailed story in English. Create a rich narrative with vivid descriptions, multiple scenes, and emotional depth.
+
+IMPORTANT:
+- The story should be substantial enough to generate 20+ visual scenes
+- Divide the story into clear paragraphs (2-4 sentences each)
+- Add blank lines between paragraphs
+- Create new paragraphs for each change in action, emotion, scene, or character focus
+- Make each paragraph represent a distinct visual moment that can be turned into a scene"""
 
         try:
             expanded_story = self.llm.generate(
