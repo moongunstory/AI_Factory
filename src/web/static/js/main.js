@@ -45,6 +45,8 @@ const AppState = {
     suggestions: []
 };
 
+const PROJECT_ID_KEY = 'current_project_id';
+
 // Tab IDs for top-level navigation
 const Tabs = {
     CINEMATIC_STORY: 'cinematic-story',
@@ -68,6 +70,41 @@ function showSection(sectionId) {
         // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+}
+
+function persistProjectId(projectId) {
+    if (!projectId) return;
+    AppState.projectId = projectId;
+    document.cookie = `project_id=${projectId}; path=/; max-age=31536000`;
+    try {
+        localStorage.setItem(PROJECT_ID_KEY, projectId);
+    } catch (err) {
+        console.warn('Unable to persist project id to localStorage', err);
+    }
+}
+
+function loadPersistedProjectId() {
+    let storedId = null;
+    try {
+        storedId = localStorage.getItem(PROJECT_ID_KEY);
+    } catch (err) {
+        console.warn('Unable to read project id from localStorage', err);
+    }
+
+    if (storedId) {
+        persistProjectId(storedId);
+    }
+    return storedId;
+}
+
+function clearPersistedProjectId() {
+    try {
+        localStorage.removeItem(PROJECT_ID_KEY);
+    } catch (err) {
+        console.warn('Unable to clear stored project id', err);
+    }
+    document.cookie = 'project_id=; Max-Age=0; path=/';
+    AppState.projectId = null;
 }
 
 function updateProgressBar(step) {
@@ -175,8 +212,24 @@ async function apiCall(url, method = 'GET', data = null) {
             }
         };
 
-        if (data) {
-            options.body = JSON.stringify(data);
+        const projectId = AppState.projectId || (() => {
+            try {
+                return localStorage.getItem(PROJECT_ID_KEY);
+            } catch (err) {
+                return null;
+            }
+        })();
+
+        let payload = data;
+        if (method !== 'GET') {
+            payload = data ? { ...data } : {};
+            if (projectId && !payload.project_id) {
+                payload.project_id = projectId;
+            }
+        }
+
+        if (payload && method !== 'GET') {
+            options.body = JSON.stringify(payload);
         }
 
         const response = await fetch(url, options);
@@ -205,6 +258,7 @@ async function fetchProjectList() {
     const listEl = document.getElementById('project-list');
     const emptyEl = document.getElementById('no-project-message');
     const filterEl = document.getElementById('project-mode-filter');
+    const sortEl = document.getElementById('project-sort-order');
 
     if (loadingEl) loadingEl.classList.remove('hidden');
     listEl?.classList.add('hidden');
@@ -222,7 +276,8 @@ async function fetchProjectList() {
             return;
         }
 
-        renderProjectList(projects);
+        const sortOrder = sortEl?.value || 'newest';
+        renderProjectList(projects, sortOrder);
     } catch (error) {
         console.error('Failed to fetch project list:', error);
     } finally {
@@ -230,7 +285,7 @@ async function fetchProjectList() {
     }
 }
 
-function renderProjectList(projects) {
+function renderProjectList(projects, sortOrder = 'newest') {
     const listEl = document.getElementById('project-list');
     const confirmBtn = document.getElementById('confirm-load-btn');
 
@@ -243,7 +298,19 @@ function renderProjectList(projects) {
         delete confirmBtn.dataset.selectedProject;
     }
 
-    projects.forEach(project => {
+    const sorted = [...projects];
+
+    sorted.sort((a, b) => {
+        if (sortOrder === 'oldest') {
+            return (a.created_at || '').localeCompare(b.created_at || '');
+        }
+        if (sortOrder === 'title') {
+            return (a.project_title || '').localeCompare(b.project_title || '');
+        }
+        return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+
+    sorted.forEach(project => {
         const card = document.createElement('div');
         card.className = 'project-card';
         card.dataset.projectId = project.project_id;
@@ -280,6 +347,9 @@ function renderProjectList(projects) {
                 project_id: project.project_id,
                 mode: project.mode || 'oneshot'
             });
+            if (AppState.projectId === project.project_id) {
+                clearPersistedProjectId();
+            }
             fetchProjectList();
         });
 
@@ -335,6 +405,10 @@ function applyLoadedProject(projectEnvelope) {
 
     const { metadata, story, prompts, images, final_video: finalVideo } = projectEnvelope;
 
+    if (metadata?.project_id) {
+        persistProjectId(metadata.project_id);
+    }
+
     AppState.projectId = metadata?.project_id || null;
     AppState.projectName = metadata?.project_title || '';
     AppState.mode = metadata?.mode || AppState.mode;
@@ -344,6 +418,7 @@ function applyLoadedProject(projectEnvelope) {
     AppState.characterSheets = story?.character_sheets || { characters: [] };
     AppState.scenes = prompts?.scenes || [];
     AppState.generatedImages = images || [];
+    AppState.generatedVideos = projectEnvelope?.videos || [];
     AppState.finalVideoPath = finalVideo?.path || null;
     AppState.finalVideoDuration = finalVideo?.duration || null;
     AppState.finalVideoResolution = finalVideo?.resolution || null;
@@ -379,6 +454,10 @@ function applyLoadedProject(projectEnvelope) {
         displayImages();
     }
 
+    if (AppState.generatedVideos && AppState.generatedVideos.length > 0) {
+        displayVideos();
+    }
+
     if (AppState.finalVideoPath) {
         displayFinalVideoResult();
     }
@@ -400,6 +479,20 @@ function applyLoadedProject(projectEnvelope) {
     updateProgressBar(step);
 }
 
+async function autoResumeProject() {
+    const storedId = loadPersistedProjectId();
+    if (!storedId) return;
+
+    try {
+        const result = await apiCall('/api/load-project', 'POST', { project_id: storedId });
+        applyLoadedProject(result.project);
+        alert('저장된 프로젝트를 자동으로 불러왔습니다.');
+    } catch (error) {
+        console.warn('자동 불러오기 실패', error);
+        clearPersistedProjectId();
+    }
+}
+
 function initProjectControls() {
     const loadBtn = document.getElementById('load-project-btn');
     const oneshotLoadBtn = document.getElementById('oneshot-load-btn');
@@ -408,6 +501,7 @@ function initProjectControls() {
     const confirmLoadBtn = document.getElementById('confirm-load-btn');
     const modal = document.getElementById('load-project-modal');
     const filterEl = document.getElementById('project-mode-filter');
+    const sortEl = document.getElementById('project-sort-order');
 
     loadBtn?.addEventListener('click', () => openLoadModal());
     oneshotLoadBtn?.addEventListener('click', () => openLoadModal());
@@ -415,6 +509,7 @@ function initProjectControls() {
     refreshBtn?.addEventListener('click', () => fetchProjectList());
     confirmLoadBtn?.addEventListener('click', () => handleProjectLoad());
     filterEl?.addEventListener('change', () => fetchProjectList());
+    sortEl?.addEventListener('change', () => fetchProjectList());
 
     modal?.addEventListener('click', (event) => {
         if (event.target === modal) {
@@ -773,16 +868,27 @@ async function expandStory() {
         // Step 1: Expand story
         const expandResult = await apiCall('/api/expand-story', 'POST', {
             simple_idea: storyIdea,
-            mode: AppState.mode || 'oneshot'
+            mode: AppState.mode || 'oneshot',
+            project_id: AppState.projectId
         });
+
+        if (expandResult.project_id) {
+            persistProjectId(expandResult.project_id);
+        }
 
         AppState.expandedStory = expandResult.expanded_story;
 
         // Step 2: Generate prompts (this includes story beats and characters)
         const promptsResult = await apiCall('/api/generate-prompts', 'POST', {
             expanded_story: AppState.expandedStory,
-            theme: AppState.theme
+            theme: AppState.theme,
+            project_id: AppState.projectId,
+            mode: AppState.mode || 'oneshot'
         });
+
+        if (promptsResult.project_id) {
+            persistProjectId(promptsResult.project_id);
+        }
 
         AppState.storyBeats = promptsResult.story_beats;
         AppState.characterSheets = promptsResult.character_sheets;
@@ -966,16 +1072,6 @@ function initPromptsDisplay() {
         updateProgressBar(2);
     });
 
-    document.getElementById('save-and-finish-btn').addEventListener('click', () => {
-        alert('저장 완료! (백엔드 저장 기능은 추가 구현 필요)');
-    });
-
-    document.getElementById('start-new-btn').addEventListener('click', () => {
-        if (confirm('새 프로젝트를 시작할까요? 현재 작업은 저장되지 않을 수 있습니다.')) {
-            location.reload();
-        }
-    });
-
     // Generate images button
     document.getElementById('generate-images-btn').addEventListener('click', async () => {
         try {
@@ -984,7 +1080,8 @@ function initPromptsDisplay() {
             const result = await apiCall('/api/generate-images', 'POST', {
                 prompts_data: {
                     scenes: AppState.scenes
-                }
+                },
+                mode: AppState.mode || 'oneshot'
             });
 
             AppState.generatedImages = result.images;
@@ -1021,7 +1118,8 @@ function initPromptsDisplay() {
             showLoading('image-regenerate-loading');
 
             const result = await apiCall('/api/regenerate-images', 'POST', {
-                scenes: scenesToRegenerate
+                scenes: scenesToRegenerate,
+                mode: AppState.mode || 'oneshot'
             });
 
             // Update images in AppState
@@ -1209,8 +1307,13 @@ async function startVideoGeneration() {
         document.getElementById('video-progress-status').textContent = '영상 생성 중...';
 
         const result = await apiCall('/api/generate-videos', 'POST', {
-            videos: videoRequests
+            videos: videoRequests,
+            mode: AppState.mode || 'oneshot'
         });
+
+        if (result.project_id) {
+            persistProjectId(result.project_id);
+        }
 
         AppState.generatedVideos = result.videos;
         displayVideos();
@@ -1228,11 +1331,12 @@ function displayVideos() {
     const container = document.getElementById('videos-container');
     container.innerHTML = '';
 
+    const totalVideos = AppState.generatedVideos.length;
     const successCount = AppState.generatedVideos.filter(v => v.video_path).length;
 
     // Update progress
-    document.getElementById('video-progress-status').textContent = `완료: ${successCount}/${AppState.generatedVideos.length}`;
-    const progress = (successCount / AppState.generatedVideos.length) * 100;
+    document.getElementById('video-progress-status').textContent = `완료: ${successCount}/${totalVideos}`;
+    const progress = totalVideos > 0 ? (successCount / totalVideos) * 100 : 0;
     document.getElementById('video-progress-bar').style.width = `${progress}%`;
 
     AppState.generatedVideos.forEach((video, index) => {
@@ -1352,9 +1456,15 @@ async function startFinalAssembly() {
                 add_subtitles: addSubtitles,
                 subtitle_style: subtitleStyle,
                 theme: AppState.theme,
-                story: AppState.expandedStory
-            }
+                story: AppState.expandedStory,
+                project_title: AppState.projectName
+            },
+            mode: AppState.mode || 'oneshot'
         });
+
+        if (result.project_id) {
+            persistProjectId(result.project_id);
+        }
 
         // Show final result
         document.getElementById('final-video-result').classList.remove('hidden');
@@ -1402,6 +1512,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show initial section
     showSection('step-0-mode-selection');
     updateProgressBar(0);
+
+    autoResumeProject();
 
     console.log('AI Short Factory - Series Studio initialized');
 });
