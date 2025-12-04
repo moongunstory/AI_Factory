@@ -83,13 +83,15 @@ class ComfyUIManager:
             print("Please ensure ComfyUI is installed in engine/comfyui/")
             return
 
-        # Determine which Python to use: venv if available, otherwise current interpreter
-        if self.comfyui_venv_python.exists():
-            python_exe = str(self.comfyui_venv_python)
-            logger.info(f"Using ComfyUI venv Python: {python_exe}")
-        else:
-            python_exe = sys.executable
-            logger.warning(f"ComfyUI venv not found, using system Python: {python_exe}")
+        # Determine which Python to use: always use venv
+        if not self.comfyui_venv_python.exists():
+            logger.error(f"ComfyUI venv Python not found: {self.comfyui_venv_python}")
+            print(f"[ERROR] ComfyUI venv Python not found at {self.comfyui_venv_python}")
+            print("Please ensure ComfyUI venv is correctly set up in engine/comfyui/venv/")
+            return
+
+        python_exe = str(self.comfyui_venv_python)
+        logger.info(f"Using ComfyUI venv Python: {python_exe}")
 
         # ComfyUI startup parameters
         params = [
@@ -106,6 +108,9 @@ class ComfyUIManager:
         print(f"포트: {self.server_port}")
         print("==========================================")
 
+        # Copy current environment variables and pass them explicitly
+        current_env = os.environ.copy()
+
         try:
             with open(self.out_log_file, "wb") as out_log, open(self.err_log_file, "wb") as err_log:
                 process = subprocess.Popen(
@@ -113,6 +118,7 @@ class ComfyUIManager:
                     stdout=out_log,
                     stderr=err_log,
                     cwd=str(self.comfyui_dir),  # Run in ComfyUI directory
+                    env=current_env,  # Pass environment variables explicitly
                     creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
                 )
 

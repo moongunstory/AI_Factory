@@ -72,12 +72,19 @@ REM ==========================================
 REM 3. Start All Backend Services
 REM ==========================================
 
+REM Activate venv for ComfyUI
+pushd "%PROJECT_DIR%engine\comfyui"
+call .\venv\Scripts\activate.bat
+popd
+
 echo [3/4] Starting backend services (llama-server + ComfyUI)...
 echo.
 
-REM Start all services (llama-server and ComfyUI)
-python "%PY_MANAGER%" start all
+set "COMFY_PY=%PROJECT_DIR%engine\comfyui\venv\Scripts\python.exe"
+
+"%COMFY_PY%" "%PY_MANAGER%" start all
 echo.
+
 
 REM ==========================================
 REM 4. Start Flask Web UI
