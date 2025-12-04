@@ -1,6 +1,6 @@
 """Prompt generation module - converts stories into Stable Diffusion prompts."""
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from ..generators.llm import LlamaClient
 from ..common.logger import setup_logger
 
@@ -187,9 +187,15 @@ Summarize into 8-20 plot beats (one sentence each)."""
         logger.info(f"Generated {len(beats)} plot beats for scene construction")
         return beats
 
-    def _validate_and_normalize_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
+    def _validate_and_normalize_result(self, result: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Dict[str, Any]:
         """Validate LLM JSON output and ensure required fields are consistent."""
-        scenes = result.get("scenes")
+        # Handle case where LLM returns array directly instead of object with "scenes" key
+        if isinstance(result, list):
+            logger.warning("LLM returned array instead of object, wrapping in scenes key")
+            scenes = result
+        else:
+            scenes = result.get("scenes")
+
         if not scenes or not isinstance(scenes, list):
             logger.error("LLM response missing scenes list")
             raise RuntimeError("LLM did not return any scenes")
