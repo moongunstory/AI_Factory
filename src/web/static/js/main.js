@@ -443,6 +443,8 @@ function applyLoadedProject(projectData) {
         document.getElementById('mode-oneshot')?.classList.add('selected');
     }
 
+    updateModeUiState();
+
     let step = 1;
 
     if (AppState.expandedStory) {
@@ -483,6 +485,7 @@ function applyLoadedProject(projectData) {
 function initProjectControls() {
     const saveBtn = document.getElementById('save-project-btn');
     const loadBtn = document.getElementById('load-project-btn');
+    const oneshotLoadBtn = document.getElementById('oneshot-load-btn');
     const closeModalBtn = document.getElementById('close-load-modal');
     const refreshBtn = document.getElementById('refresh-project-list-btn');
     const confirmLoadBtn = document.getElementById('confirm-load-btn');
@@ -492,6 +495,7 @@ function initProjectControls() {
 
     saveBtn?.addEventListener('click', () => saveCurrentProject());
     loadBtn?.addEventListener('click', () => openLoadModal());
+    oneshotLoadBtn?.addEventListener('click', () => openLoadModal());
     closeModalBtn?.addEventListener('click', () => closeLoadModal());
     refreshBtn?.addEventListener('click', () => fetchProjectList());
     confirmLoadBtn?.addEventListener('click', () => handleProjectLoad());
@@ -521,6 +525,13 @@ function initProjectControls() {
 // Step 0: Mode Selection
 // ============================================================================
 
+function updateModeUiState() {
+    const resumePanel = document.getElementById('oneshot-resume-panel');
+    if (resumePanel) {
+        resumePanel.classList.toggle('hidden', AppState.mode !== 'oneshot');
+    }
+}
+
 function initModeSelection() {
     const modeButtons = document.querySelectorAll('.mode-select-btn');
 
@@ -535,6 +546,7 @@ function initModeSelection() {
 function selectMode(mode) {
     AppState.mode = mode;
     AppState.currentStep = 1;
+    updateModeUiState();
 
     if (mode === 'oneshot') {
         // Skip series setup, go directly to story input
