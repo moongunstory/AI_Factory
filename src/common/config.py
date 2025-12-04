@@ -23,6 +23,12 @@ class Config:
 
     # Output paths
     OUTPUT_DIR = ROOT_DIR / "output"
+    # Project-scoped roots
+    ONESHOT_DIR = OUTPUT_DIR / "oneshot"
+    SERIES_DIR = OUTPUT_DIR / "series"
+    MEME_DIR = OUTPUT_DIR / "meme"
+
+    # Legacy paths (kept for backward compatibility where needed)
     CLIPS_DIR = OUTPUT_DIR / "clips"
     IMAGES_DIR = OUTPUT_DIR / "images"
     VIDEO_SEGMENTS_DIR = OUTPUT_DIR / "video_segments"
@@ -79,8 +85,17 @@ class Config:
     @classmethod
     def ensure_output_dirs(cls) -> None:
         """Create output directories if they don't exist."""
-        for dir_path in [cls.CLIPS_DIR, cls.IMAGES_DIR, cls.VIDEO_SEGMENTS_DIR,
-                         cls.FINAL_DIR, cls.LOGS_DIR, cls.PROMPTS_DIR]:
+        for dir_path in [
+            cls.ONESHOT_DIR,
+            cls.SERIES_DIR,
+            cls.MEME_DIR,
+            cls.CLIPS_DIR,
+            cls.IMAGES_DIR,
+            cls.VIDEO_SEGMENTS_DIR,
+            cls.FINAL_DIR,
+            cls.LOGS_DIR,
+            cls.PROMPTS_DIR,
+        ]:
             dir_path.mkdir(parents=True, exist_ok=True)
 
     @classmethod

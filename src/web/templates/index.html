@@ -16,17 +16,10 @@
 
         <section class="project-toolbar" aria-label="project controls">
             <div class="project-meta">
-                <label class="project-name-label" for="project-name-input">프로젝트 이름</label>
-                <input id="project-name-input" class="form-input project-name-input" type="text"
-                       placeholder="예: 시즌1 - 에피소드3" aria-label="프로젝트 이름">
-                <div id="project-save-status" class="project-save-status">아직 저장되지 않았습니다</div>
+                <p class="section-description">프로젝트는 각 단계 완료 시 자동으로 저장됩니다.</p>
             </div>
             <div class="project-actions">
-                <label class="autosave-toggle" for="autosave-toggle">
-                    <input id="autosave-toggle" type="checkbox"> 자동 저장 (1분 간격)
-                </label>
-                <button id="load-project-btn" class="btn btn-secondary" type="button">📂 이어서 하기</button>
-                <button id="save-project-btn" class="btn btn-primary" type="button">💾 지금 저장</button>
+                <button id="load-project-btn" class="btn btn-secondary" type="button">📂 프로젝트 불러오기</button>
             </div>
         </section>
 
@@ -576,6 +569,16 @@
                 <button id="close-load-modal" class="modal-close" aria-label="닫기">✕</button>
             </div>
             <div class="modal-body">
+                <div class="project-filters">
+                    <label for="project-mode-filter">필터:</label>
+                    <select id="project-mode-filter" class="form-input">
+                        <option value="all">전체</option>
+                        <option value="oneshot">원샷</option>
+                        <option value="series">시리즈</option>
+                        <option value="meme">메타</option>
+                    </select>
+                    <span class="filter-hint">최신순 정렬 · 삭제 시 바로 제거됩니다.</span>
+                </div>
                 <div id="load-project-loading" class="loading">목록을 불러오는 중...</div>
                 <div id="project-list" class="project-list hidden"></div>
                 <div id="no-project-message" class="info-message hidden">저장된 프로젝트가 없습니다.</div>
