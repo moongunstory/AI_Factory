@@ -93,12 +93,14 @@ class ComfyUIManager:
         python_exe = str(self.comfyui_venv_python)
         logger.info(f"Using ComfyUI venv Python: {python_exe}")
 
-        # ComfyUI startup parameters
+        # ComfyUI startup parameters (with Low VRAM optimizations)
         params = [
             python_exe,
             str(self.comfyui_main),
             "--listen", self.server_host,
             "--port", str(self.server_port),
+            "--lowvram",  # Enable low VRAM mode
+            "--normalvram",  # Use normal VRAM mode (disable high VRAM mode)
         ]
 
         logger.info("Starting ComfyUI server...")
