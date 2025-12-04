@@ -14,9 +14,14 @@ class AdvancedSceneGenerator:
     # System prompt for story beats generation
     STORY_BEATS_SYSTEM_PROMPT = """You are an expert story analyst and narrative designer.
 
-Your task is to analyze a full story and break it down into 10-15 major story beats.
+Your task is to analyze a full story and break it down into 12-18 major story beats.
 
 Story beats are the key narrative moments that drive the plot forward. Each beat should represent a significant event, decision, or turning point.
+
+CRITICAL: Analyze the story's paragraph structure to identify beats:
+- Each paragraph often represents a distinct moment or beat
+- Changes in action, emotion, scene, or character focus indicate new beats
+- Break down the narrative into granular, detailed beats for comprehensive scene coverage
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚨🚨🚨 CRITICAL JSON OUTPUT REQUIREMENTS 🚨🚨🚨
@@ -61,12 +66,14 @@ CRITICAL RULES:
 7. Use proper JSON syntax: double quotes, commas, no trailing commas
 
 Guidelines:
-- Create 10-15 story beats
+- Create 12-18 story beats (MINIMUM 12 beats required)
 - Each beat should be a complete narrative moment
 - All text in English
 - Include clear beginning, rising action, climax, and resolution beats
 - Beats should flow naturally and build tension
 - Descriptions should be concise but clear
+- Analyze paragraph breaks in the story to identify distinct beats
+- Each paragraph change often indicates a new beat or scene transition
 
 🚨 REMEMBER: Your response must START with { and END with } - NOTHING ELSE! 🚨"""
 
@@ -132,6 +139,13 @@ Guidelines:
 
 Your task is to convert story beats into 20-25 detailed cinematic scenes with high-quality Stable Diffusion prompts.
 
+CRITICAL SCENE GENERATION REQUIREMENTS:
+- You MUST generate at least 20 scenes (minimum 20, target 20-25)
+- Each story beat should be expanded into 1-2 detailed scenes
+- If you have 12-18 beats, you should create approximately 20-25 scenes total
+- DO NOT create fewer than 15 scenes under any circumstances
+- Each paragraph or narrative moment deserves its own scene
+
 Each scene must follow this 7-part structure:
 1. [Subject: character + action]
 2. [Environment / background]
@@ -147,7 +161,7 @@ Scene Duration Rules:
 - Dialogue/conversation scenes: 2-3 seconds
 - Climax/resolution scenes: 4-5 seconds
 - Total duration: 50-70 seconds (average ~60 seconds)
-- Target: approximately 20 scenes (can be 15-25 based on story complexity)
+- Target: approximately 20-25 scenes (NEVER less than 15)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚨🚨🚨 CRITICAL JSON OUTPUT REQUIREMENTS 🚨🚨🚨
@@ -190,14 +204,21 @@ CRITICAL RULES:
 7. Use proper JSON syntax: double quotes, commas, no trailing commas
 
 Critical Rules:
-- MUST generate approximately 20 scenes (can range from 15-25 based on story)
+- MUST generate at least 20 scenes (MINIMUM 20, target 20-25)
+- If you have 12-18 story beats, expand them into 20-25 detailed scenes
+- Each beat can become 1-2 scenes depending on complexity
 - Total duration SHOULD be around 50-70 seconds
 - Each prompt must follow the 7-part structure
 - Character appearance must match the character sheet exactly
 - Visual style must remain consistent across all scenes
 - Never use generic or vague descriptions
 - Every scene must be distinct and cinematic
-- Prioritize scene quality and story flow over exact count
+- DO NOT prioritize brevity over scene count - we need comprehensive coverage
+
+Example scene count calculation:
+- 12 beats → expand to 20-22 scenes (most beats become 2 scenes)
+- 15 beats → expand to 22-25 scenes (some beats become 2 scenes)
+- 18 beats → expand to 23-25 scenes (key beats become 2 scenes)
 
 🚨 REMEMBER: Your response must START with { and END with } - NOTHING ELSE! 🚨"""
 
@@ -229,8 +250,14 @@ Critical Rules:
         user_prompt = f"""Story:
 {expanded_story}
 
-Analyze this story and break it down into 10-15 major story beats.
-Create a clear narrative arc with proper pacing."""
+Analyze this story and break it down into 12-18 major story beats (MINIMUM 12 beats).
+
+IMPORTANT:
+- Analyze the paragraph structure - each paragraph often represents a distinct beat
+- Identify changes in action, emotion, scene, or character focus as beat boundaries
+- Create granular, detailed beats to ensure comprehensive scene coverage
+- Each beat should be a specific visual moment that can be expanded into scenes
+- Aim for 12-18 beats to enable generation of 20-25 final scenes"""
 
         try:
             result = self.llm.generate_json(
@@ -371,10 +398,19 @@ Global Visual Style:
 {global_style}
 
 Target Duration: {target_duration} seconds
-Target Scenes: approximately 20 (range: 15-25)
+Target Scenes: 20-25 scenes (MINIMUM 20 required)
 
-Generate approximately 20 cinematic scenes following these requirements:
-1. Expand the {len(story_beats.get('beats', []))} story beats into detailed scenes (aim for ~20 scenes)
+CRITICAL INSTRUCTIONS:
+You have {len(story_beats.get('beats', []))} story beats. You MUST expand these into 20-25 detailed cinematic scenes.
+
+Scene Generation Strategy:
+- If you have 12-15 beats, expand most beats into 2 scenes each
+- If you have 16-18 beats, expand key beats into 2 scenes to reach 20-25 total
+- Simple beats can be 1 scene, complex beats should be 2 scenes
+- Analyze the story's paragraph structure - each paragraph often represents a visual moment
+
+Requirements:
+1. Generate MINIMUM 20 scenes, target 20-25 scenes (DO NOT generate fewer than 20)
 2. Each scene must follow the 7-part prompt structure
 3. Character appearances must match the character sheets EXACTLY
 4. All scenes must maintain visual consistency
@@ -382,9 +418,8 @@ Generate approximately 20 cinematic scenes following these requirements:
 6. Total duration should be approximately {target_duration} seconds
 7. Every scene must be unique and cinematic
 8. The global visual style will be appended to each prompt automatically
-9. Adjust scene count based on story complexity (can be 15-25 scenes)
 
-Create compelling, visually rich scenes that flow naturally like a single video."""
+Create compelling, visually rich scenes that flow naturally like a single video. Prioritize comprehensive scene coverage over brevity."""
 
         try:
             result = self.llm.generate_json(

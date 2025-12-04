@@ -41,7 +41,7 @@ class PipelineStatus:
 def generate_short(
     theme: str,
     style: str = "cinematic",
-    scene_count: int = 4,
+    scene_count: int = 20,
     title_hint: Optional[str] = None,
     progress_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
 ) -> Dict[str, Any]:
@@ -56,7 +56,7 @@ def generate_short(
     Args:
         theme: Theme/concept for the short (e.g., "space adventure")
         style: Visual style (e.g., "cinematic", "anime", "watercolor")
-        scene_count: Number of scenes (default: 4)
+        scene_count: Number of scenes (default: 20)
         title_hint: Optional title hint
         progress_callback: Optional callback for progress updates
 

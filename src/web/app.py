@@ -665,14 +665,14 @@ def generate_short_api():
         data = request.get_json()
         theme = data.get('theme', '').strip()
         style = data.get('style', 'cinematic').strip()
-        scene_count = int(data.get('scene_count', 4))
+        scene_count = int(data.get('scene_count', 20))
         title_hint = data.get('title_hint', '').strip() or None
 
         if not theme:
             return jsonify({'error': 'Theme is required'}), 400
 
-        if scene_count < 1 or scene_count > 12:
-            return jsonify({'error': 'Scene count must be between 1 and 12'}), 400
+        if scene_count < 12 or scene_count > 30:
+            return jsonify({'error': 'Scene count must be between 12 and 30'}), 400
 
         logger.info(f"Starting short generation: theme='{theme}', style='{style}', scenes={scene_count}")
 
