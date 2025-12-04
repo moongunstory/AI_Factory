@@ -38,7 +38,7 @@ if errorlevel 1 (
 )
 
 REM Check model file
-set "MODEL_PATH=%PROJECT_DIR%models\solar-10.7b\solar-10.7b-instruct-v1.0.Q6_K.gguf"
+set "MODEL_PATH=%PROJECT_DIR%models\llm\Meta-Llama-3.1-8B-Instruct-Q5_K_M\Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf"
 if not exist "%MODEL_PATH%" (
     echo [ERROR] Model file not found: %MODEL_PATH%
     echo Please download the model file first.

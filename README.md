@@ -75,7 +75,8 @@ AI_Short_Factory/
 │       ├── app.py                          # Flask 웹 서버
 │       └── templates/                      # HTML 템플릿
 ├── models/
-│   └── solar-10.7b/                        # SOLAR 10.7B 모델 (Q6_K)
+│   └── llm/
+│       └── Meta-Llama-3.1-8B-Instruct-Q5_K_M/    # Meta Llama 3.1 모델 (Q5_K_M)
 └── output/                                  # 생성된 결과물 저장
     ├── prompts/                            # 장면 프롬프트 JSON/텍스트
     └── logs/                               # 로그 파일
@@ -91,7 +92,7 @@ AI_Short_Factory/
 - **Visual Studio 2022** (C++ 빌드 도구)
 - **Python 3.11+**
 - **llama.cpp** (CUDA 빌드)
-- **GGUF 모델** (SOLAR 10.7B Q6_K 사용 중)
+- **GGUF 모델** (Meta Llama 3.1 Q5_K_M 사용 중)
 
 ### 2. 설치
 
@@ -122,14 +123,14 @@ cd ../..
 
 ### 3. 모델 준비
 
-SOLAR 10.7B Q6_K 모델 다운로드:
+Meta Llama 3.1 Q5_K_M 모델 다운로드:
 ```powershell
-# models 디렉토리 생성
-mkdir models\solar-10.7b
+# models/llm/ 디렉토리 생성
+mkdir models\llm\Meta-Llama-3.1-8B-Instruct-Q5_K_M
 
-# SOLAR 10.7B Q6_K GGUF 모델 다운로드
-# Hugging Face: https://huggingface.co/upstage/solar-10.7b-instruct-v1.0-GGUF
-# 파일 위치: models\solar-10.7b\solar-10.7b-instruct-v1.0.Q6_K.gguf
+# Meta Llama 3.1 Q5_K_M GGUF 모델 다운로드
+# Hugging Face: https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct-GGUF
+# 파일 위치: models\llm\Meta-Llama-3.1-8B-Instruct-Q5_K_M\Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf
 ```
 
 ### 4. llama-server 관리
@@ -369,8 +370,8 @@ powershell -ExecutionPolicy Bypass -File llama_server_manager.ps1 -Action restar
 ### Model not found
 ```powershell
 # models/ 디렉토리 확인
-dir models\solar-10.7b\
-# GGUF 모델 파일 확인: solar-10.7b-instruct-v1.0.Q6_K.gguf
+dir models\llm\Meta-Llama-3.1-8B-Instruct-Q5_K_M\
+# GGUF 모델 파일 확인: Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf
 ```
 
 ### JSON 파싱 오류
@@ -419,7 +420,7 @@ Get-Content output\logs\llama_server.log -Tail 50
 
 - [llama.cpp 공식 문서](https://github.com/ggerganov/llama.cpp)
 - [CUDA Toolkit 다운로드](https://developer.nvidia.com/cuda-downloads)
-- [SOLAR 10.7B 모델](https://huggingface.co/upstage/solar-10.7b-instruct-v1.0-GGUF)
+- [Meta Llama 3.1 모델](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct-GGUF)
 - [Stable Diffusion 프롬프트 가이드](https://stable-diffusion-art.com/prompt-guide/)
 
 ## 🎓 사용 예시
