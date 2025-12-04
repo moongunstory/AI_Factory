@@ -2,7 +2,6 @@
 import streamlit as st
 from src.pipeline.story_expander import StoryExpander
 from src.pipeline.prompt_generator import PromptGenerator
-from src.pipeline.translator import Translator
 from src.common.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -20,8 +19,7 @@ def get_components():
     """Initialize and cache AI components."""
     return {
         'expander': StoryExpander(),
-        'generator': PromptGenerator(),
-        'translator': Translator()
+        'generator': PromptGenerator()
     }
 
 # Initialize session state
@@ -153,34 +151,28 @@ if 'retry_story_button' in locals() and retry_story_button:
 
 # Confirm and generate prompts
 if 'confirm_button' in locals() and confirm_button:
-    with st.spinner("장면 프롬프트를 생성하는 중... 🎨"):
+    with st.spinner("Generating scene prompts... 🎨"):
         try:
-            # Generate prompts
+            # Generate prompts (English only)
             prompts_data = components['generator'].generate(st.session_state.expanded_story)
 
-            # Translate each prompt to Korean
-            translator = components['translator']
+            # Keep English only
             for scene in prompts_data.get('scenes', []):
-                prompt_en = scene.get('prompt_en', '')
-                if prompt_en:
-                    scene['prompt_kr'] = translator.translate(prompt_en)
-                else:
-                    scene['prompt_kr'] = ''
+                scene['prompt_kr'] = scene.get('prompt_en', '')
 
             st.session_state.prompts_data = prompts_data
             st.session_state.selected_scenes = set()
             st.rerun()
         except Exception as e:
-            st.error(f"❌ 프롬프트 생성 실패: {e}")
+            st.error(f"❌ Prompt generation failed: {e}")
             logger.error(f"Prompt generation failed: {e}")
 
 # Regenerate selected scenes
 if 'regenerate_button' in locals() and regenerate_button:
-    with st.spinner(f"{len(st.session_state.selected_scenes)}개 장면을 재생성하는 중... 🔄"):
+    with st.spinner(f"Regenerating {len(st.session_state.selected_scenes)} scenes... 🔄"):
         try:
             prompts_data = st.session_state.prompts_data
             generator = components['generator']
-            translator = components['translator']
 
             for scene in prompts_data.get('scenes', []):
                 scene_num = scene.get('scene_number')
@@ -194,9 +186,9 @@ if 'regenerate_button' in locals() and regenerate_button:
                         scene_description=scene.get('description_kr', '')
                     )
 
-                    # Update the scene
+                    # Update the scene (English only)
                     scene['prompt_en'] = new_scene.get('prompt_en', '')
-                    scene['prompt_kr'] = translator.translate(scene['prompt_en'])
+                    scene['prompt_kr'] = scene['prompt_en']
                     scene['description_kr'] = new_scene.get('description_kr', '')
                     scene['duration'] = new_scene.get('duration', scene.get('duration', 5.0))
 
@@ -204,7 +196,7 @@ if 'regenerate_button' in locals() and regenerate_button:
             st.rerun()
 
         except Exception as e:
-            st.error(f"❌ 장면 재생성 실패: {e}")
+            st.error(f"❌ Scene regeneration failed: {e}")
             logger.error(f"Scene regeneration failed: {e}")
 
 # Footer
