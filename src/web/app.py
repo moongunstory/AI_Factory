@@ -12,7 +12,6 @@ sys.path.insert(0, str(project_root))
 
 from src.pipeline.story_expander import StoryExpander
 from src.pipeline.prompt_generator import PromptGenerator
-from src.pipeline.advanced_scene_generator import AdvancedSceneGenerator
 from src.pipeline.visual_styles import VisualStyleDefinitions
 from src.pipeline.next_episode_suggester import NextEpisodeSuggester
 from src.data.universe_manager import UniverseManager
@@ -53,7 +52,6 @@ def get_components():
         components = {
             'expander': StoryExpander(),
             'generator': PromptGenerator(),
-            'advanced_generator': AdvancedSceneGenerator(),
             'suggester': NextEpisodeSuggester(),
             'universe_mgr': UniverseManager(data_root),
             'character_mgr': CharacterManager(data_root),
@@ -135,7 +133,7 @@ def expand_story():
 
 @app.route('/api/generate-prompts', methods=['POST'])
 def generate_prompts():
-    """Generate scene prompts from expanded story using advanced scene generator (English only)."""
+    """Generate scene prompts from expanded story using PromptGenerator (English only)."""
     try:
         data = request.get_json()
         expanded_story = data.get('expanded_story', '').strip()
@@ -151,59 +149,39 @@ def generate_prompts():
         if not expanded_story:
             return jsonify({'error': 'No story available'}), 400
 
-        logger.info(f"Generating advanced scene prompts (20-25 scenes) with theme: {theme}...")
+        logger.info(f"Generating scene prompts with theme: {theme}...")
         logger.info(f"Using story: {expanded_story[:100]}...")
 
         comp = get_components()
-        advanced_gen = comp['advanced_generator']
+        generator = comp['generator']  # Use PromptGenerator (multi-step pipeline)
 
-        # Step 1: Generate story beats (in English)
-        logger.info("Step 1: Generating story beats...")
-        story_beats = advanced_gen.generate_story_beats(expanded_story, temperature=0.7)
+        # Generate scenes using the stable multi-step pipeline
+        logger.info("Generating scenes using multi-step pipeline...")
+        scenes_result = generator.generate(expanded_story, temperature=0.7)
 
-        # Step 2: Generate character sheets (in English)
-        logger.info("Step 2: Generating character sheets...")
-        character_sheets = advanced_gen.generate_character_sheet(
-            expanded_story,
-            story_beats,
-            theme=theme,
-            temperature=0.6
-        )
-
-        # Step 3: Generate 20-25 scenes (in English)
-        logger.info("Step 3: Generating 20-25 scenes...")
-        scenes_result = advanced_gen.generate_scenes(
-            expanded_story,
-            story_beats,
-            character_sheets,
-            theme=theme,
-            target_duration=60.0,
-            temperature=0.7
-        )
-
-        # Format scenes for frontend (English only)
+        # Extract scenes
         scenes = scenes_result.get('scenes', [])
 
         # Prepare final prompts data
         prompts_data = {
             'scenes': scenes,
-            'total_scenes': len(scenes),
-            'estimated_duration': scenes_result.get('total_duration', 0)
+            'total_scenes': scenes_result.get('total_scenes', len(scenes)),
+            'estimated_duration': scenes_result.get('estimated_duration', 0)
         }
 
         # Store in session for regeneration
         session['prompts_data'] = prompts_data
-        session['story_beats'] = story_beats
-        session['character_sheets'] = character_sheets
         session['theme'] = theme
+        # Note: story_beats and character_sheets not used by PromptGenerator
+        # These can be added later if needed
 
         logger.info(f"Generated {len(scenes)} scenes successfully")
 
         return jsonify({
             'success': True,
             'prompts_data': prompts_data,
-            'story_beats': story_beats,
-            'character_sheets': character_sheets
+            'story_beats': [],  # Empty for backwards compatibility
+            'character_sheets': {'characters': []}  # Empty for backwards compatibility
         })
 
     except RuntimeError as e:
@@ -254,7 +232,7 @@ def regenerate_scene():
 
 @app.route('/api/regenerate-scenes', methods=['POST'])
 def regenerate_scenes():
-    """Regenerate multiple selected scenes using advanced scene generator (English only)."""
+    """Regenerate multiple selected scenes using PromptGenerator (English only)."""
     try:
         data = request.get_json()
         scenes_to_regenerate = data.get('scenes', [])
@@ -263,14 +241,10 @@ def regenerate_scenes():
         if not scenes_to_regenerate:
             return jsonify({'error': 'No scenes to regenerate'}), 400
 
-        logger.info(f"Regenerating {len(scenes_to_regenerate)} scenes with theme: {theme}...")
+        logger.info(f"Regenerating {len(scenes_to_regenerate)} scenes...")
 
         comp = get_components()
-        advanced_gen = comp['advanced_generator']
-
-        # Get character sheets and global style from session
-        character_sheets = session.get('character_sheets', {'characters': []})
-        global_style = VisualStyleDefinitions.get_global_style_prompt(theme)
+        generator = comp['generator']  # Use PromptGenerator
 
         regenerated_scenes = []
 
@@ -278,12 +252,10 @@ def regenerate_scenes():
             scene_number = scene_info.get('scene_number')
             scene_description = scene_info.get('scene_description', '')
 
-            # Regenerate this scene with advanced generator
-            new_scene = advanced_gen.regenerate_scene(
+            # Regenerate this scene with PromptGenerator
+            new_scene = generator.regenerate_scene(
                 scene_number=scene_number,
                 scene_description=scene_description,
-                character_sheets=character_sheets,
-                global_style=global_style,
                 temperature=0.7
             )
 
