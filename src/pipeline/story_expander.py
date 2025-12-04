@@ -11,14 +11,15 @@ class StoryExpander:
 
     SYSTEM_PROMPT = """You are a creative storytelling AI specialized in creating engaging short-form video content (YouTube Shorts, TikTok, Instagram Reels).
 
-Your task is to take a simple story idea and expand it into a compelling 1-2 minute narrative suitable for short-form video.
+Your task is to take a simple story idea and expand it into a compelling narrative suitable for short-form video.
 
 Guidelines:
-- Story should be 1-2 minutes when narrated (approximately 150-300 words in English)
-- Create a clear beginning, middle, and end
+- Story should be rich and detailed (approximately 300-500 words in English)
+- Create a clear beginning, middle, and end with well-developed scenes
 - Include vivid visual descriptions that work well for video
 - Make it engaging and emotionally resonant
-- Keep the pacing fast and dynamic
+- Develop the narrative with sufficient depth for 20+ visual scenes
+- Include atmospheric details, character emotions, and environmental descriptions
 - Write ENTIRELY in English
 
 Respond with ONLY the expanded story in English. No additional explanations or metadata."""
@@ -46,14 +47,14 @@ Respond with ONLY the expanded story in English. No additional explanations or m
 
         user_prompt = f"""Simple story idea: {simple_idea}
 
-Expand this into a compelling 1-2 minute story in English. Make it vivid, engaging, and perfect for short-form video."""
+Expand this into a compelling, detailed story in English. Create a rich narrative with vivid descriptions, multiple scenes, and emotional depth. The story should be substantial enough to generate 20+ visual scenes."""
 
         try:
             expanded_story = self.llm.generate(
                 prompt=user_prompt,
                 system_prompt=self.SYSTEM_PROMPT,
                 temperature=temperature,
-                max_tokens=1024,
+                max_tokens=2048,  # Increased from 1024 to support longer stories
             )
 
             # Clean up the output

@@ -613,12 +613,14 @@ function initStoryExpanded() {
         updateProgressBar(3);
     });
 
-    document.getElementById('story-retry-btn').addEventListener('click', () => {
+    document.getElementById('story-retry-btn').addEventListener('click', async () => {
+        // Go back to Step 1 and regenerate
         showSection('step-1-story-input');
         updateProgressBar(1);
     });
 
     document.getElementById('story-expanded-back-btn').addEventListener('click', () => {
+        // Go back to Step 1 without clearing data
         showSection('step-1-story-input');
         updateProgressBar(1);
     });
@@ -656,22 +658,15 @@ function displayScenes() {
     AppState.scenes.forEach((scene, index) => {
         const sceneEl = document.createElement('div');
         sceneEl.className = 'scene-card';
+        // Only show scene number, no title
         sceneEl.innerHTML = `
             <div class="scene-header">
-                <div class="scene-title">Scene ${scene.scene_number}</div>
+                <div class="scene-title">${scene.scene_number}</div>
                 <span class="scene-duration">${scene.duration}초</span>
             </div>
-            <div class="scene-description">${scene.description || scene.description_kr || ''}</div>
             <div class="scene-prompt">
-                <span class="prompt-label">프롬프트 (EN):</span>
                 <div class="prompt-text">${scene.prompt_en}</div>
             </div>
-            ${scene.prompt_kr ? `
-                <div class="scene-prompt">
-                    <span class="prompt-label">프롬프트 (KR):</span>
-                    <div class="prompt-text">${scene.prompt_kr}</div>
-                </div>
-            ` : ''}
             <div class="scene-actions">
                 <label>
                     <input type="checkbox" class="scene-checkbox" data-scene="${index}">
@@ -713,6 +708,13 @@ window.copyPrompt = function(index) {
 };
 
 function initPromptsDisplay() {
+    // Back button to Step 2 (preserving state)
+    document.getElementById('prompts-back-btn').addEventListener('click', () => {
+        AppState.currentStep = 2;
+        showSection('step-2-story-expanded');
+        updateProgressBar(2);
+    });
+
     document.getElementById('save-and-finish-btn').addEventListener('click', () => {
         alert('저장되었습니다! (실제 저장 기능은 백엔드 추가 필요)');
     });
