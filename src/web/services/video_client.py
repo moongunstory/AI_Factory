@@ -95,7 +95,6 @@ class ComfyUIVideoClient:
         camera_prompt: str,
         fps: int,
     ) -> Dict[str, Any]:
-        """Inject runtime parameters into the workflow template."""
 
         replacements = {
             "{image_path}": str(image_path),
@@ -104,15 +103,31 @@ class ComfyUIVideoClient:
             "{camera_prompt}": camera_prompt,
         }
 
+        # 1️⃣ placeholder 교체 (기존 로직 유지)
         workflow = self._replace_placeholders(workflow, replacements)
 
-        for node in workflow.get("nodes", []):
-            inputs = node.get("inputs", {})
+        # 2️⃣ nodes 리스트를 ComfyUI REST 형식으로 변환
+        nodes_list = workflow.get("nodes", [])
+        prompt_nodes = {}
 
+        for node in nodes_list:
+            node_id = str(node.get("id"))
+            if not node_id:
+                raise RuntimeError(f"Node without id: {node}")
+
+            if "class_type" not in node:
+                raise RuntimeError(f"Node {node_id} missing class_type")
+
+            # 먼저 입력만 복사
+            inputs = dict(node.get("inputs", {}))
+
+            # 3️⃣ 모든 입력 패치 (기존 입력 패치 로직)
+            # 이미지 path 변경
             for key in ("image", "image_path", "input_image", "init_image", "bg_image"):
                 if key in inputs:
                     inputs[key] = str(image_path)
 
+            # 출력 경로 변경
             if "filename_prefix" in inputs:
                 inputs["filename_prefix"] = str(output_path.with_suffix(""))
             if "output_path" in inputs:
@@ -120,19 +135,29 @@ class ComfyUIVideoClient:
             if "output_dir" in inputs:
                 inputs["output_dir"] = str(output_path.parent)
 
+            # 영상 fps 설정
             for fps_key in ("fps", "frame_rate", "video_frame_rate"):
                 if fps_key in inputs:
                     inputs[fps_key] = fps
 
+            # 영상 길이 설정
             for length_key in ("seconds", "duration", "length_sec", "video_length"):
                 if length_key in inputs:
                     inputs[length_key] = duration_sec
 
+            # 카메라 설정
             for camera_key in ("camera", "camera_prompt", "camera_motion"):
                 if camera_key in inputs:
                     inputs[camera_key] = camera_prompt
 
-        return workflow
+            # 4️⃣ REST 형식으로 저장
+            prompt_nodes[node_id] = {
+                "class_type": node["class_type"],
+                "inputs": inputs,
+            }
+
+        # 5️⃣ ComfyUI REST API가 요구하는 최종 포맷
+        return {"prompt": prompt_nodes}
 
     def _replace_placeholders(self, obj: Any, replacements: Dict[str, str]) -> Any:
         if isinstance(obj, dict):
