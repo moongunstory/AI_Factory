@@ -1293,19 +1293,24 @@ async function startVideoGeneration() {
     `;
 
     try {
-        const durationInput = parseFloat(document.getElementById('video-length')?.value || '2.5');
-        const cameraInput = document.getElementById('video-camera')?.value || 'cinematic movement';
-        const fpsInput = parseInt(document.getElementById('video-fps')?.value || '24', 10) || 24;
+        // Use default values - AI will automatically configure video parameters
+        const defaultDuration = 2.5;
+        const defaultCamera = 'cinematic movement';
+        const defaultFps = 24;
 
         // Call video generation API
         const validImages = AppState.generatedImages.filter(img => img.image_path);
-        const videoRequests = validImages.map(img => ({
-            scene_number: img.scene_number,
-            image_path: img.image_path,
-            video_prompt: AppState.scenes.find(s => s.scene_number === img.scene_number)?.video_prompt || cameraInput,
-            duration: img.duration || durationInput,
-            fps: fpsInput
-        }));
+        const videoRequests = validImages.map(img => {
+            const scene = AppState.scenes.find(s => s.scene_number === img.scene_number);
+            return {
+                scene_number: img.scene_number,
+                image_path: img.image_path,
+                video_prompt: scene?.video_prompt || scene?.description || defaultCamera,
+                duration: scene?.duration || img.duration || defaultDuration,
+                fps: defaultFps,
+                scene_description: scene?.description || ''
+            };
+        });
 
         // Update progress
         document.getElementById('video-progress-status').textContent = '영상 생성 중...';
@@ -1314,9 +1319,9 @@ async function startVideoGeneration() {
             videos: videoRequests,
             mode: AppState.mode || 'oneshot',
             options: {
-                duration: durationInput,
-                camera: cameraInput,
-                fps: fpsInput
+                duration: defaultDuration,
+                camera: defaultCamera,
+                fps: defaultFps
             }
         });
 
