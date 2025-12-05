@@ -3,7 +3,7 @@
 This module orchestrates the complete workflow:
 1. Story & scene generation (llama-server)
 2. Image generation per scene (ComfyUI + SDXL)
-3. Video generation per scene (ComfyUI WAN2.2 workflow)
+3. Video generation per scene (ComfyUI + SVD)
 4. Final video assembly (ffmpeg concat)
 """
 import json
@@ -28,7 +28,7 @@ _current_pipeline_state: Optional[Dict[str, Any]] = None
 
 
 # ====================================================================
-# Rule Table for WAN2.2 Video Generation Parameters
+# Rule Table for SVD Video Generation Parameters
 # ====================================================================
 VIDEO_PARAMS_RULE_TABLE = {
     "CHARACTER": {"camera_prompt": "static", "fps": 15, "duration_sec": 4.0},
@@ -96,7 +96,7 @@ def generate_short(
     This function orchestrates the entire workflow:
     1. Generate story breakdown via llama-server
     2. Generate vertical images for each scene via ComfyUI + SDXL
-    3. Generate video clips for each scene via WAN2.2 I2V
+    3. Generate video clips for each scene via SVD (Stable Video Diffusion)
     4. Concatenate all clips into final vertical video
 
     Args:
