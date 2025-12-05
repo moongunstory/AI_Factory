@@ -14,7 +14,15 @@ logger = setup_logger(__name__)
 
 
 class ComfyUIVideoClient:
-    """Direct WAN2.2-style video prompt builder & submitter."""
+    """SVD (Stable Video Diffusion) video generator."""
+
+    # Camera prompt to motion_bucket_id mapping
+    CAMERA_TO_MOTION = {
+        "static": 50,
+        "forward": 127,
+        "orbit": 180,
+        "cinematic": 100,
+    }
 
     def __init__(
         self,
@@ -38,16 +46,22 @@ class ComfyUIVideoClient:
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        prompt = self.build_wan22_prompt(
+        # Calculate frames from duration and fps
+        num_frames = int(duration_sec * fps)
+
+        # Map camera_prompt to motion_bucket_id
+        motion_bucket_id = self.CAMERA_TO_MOTION.get(camera_prompt, 127)
+
+        prompt = self.build_svd_prompt(
             image_path=image_path,
             output_path=output_path,
-            duration_sec=duration_sec,
+            num_frames=num_frames,
             fps=fps,
-            camera_prompt=camera_prompt,
+            motion_bucket_id=motion_bucket_id,
         )
 
         prompt_id = self._queue_prompt(prompt)
-        logger.info(f"Queued WAN2.2 prompt: {prompt_id}")
+        logger.info(f"Queued SVD prompt: {prompt_id} (frames={num_frames}, fps={fps}, motion={motion_bucket_id})")
 
         if not self._wait_for_completion(prompt_id, timeout=self.timeout):
             raise RuntimeError(f"Video generation timed out after {self.timeout}s")
@@ -57,32 +71,102 @@ class ComfyUIVideoClient:
             "video_path": str(output_path),
         }
 
-    def build_wan22_prompt(
+    def build_svd_prompt(
         self,
         image_path: Path,
         output_path: Path,
-        duration_sec: float,
+        num_frames: int,
         fps: int,
-        camera_prompt: str,
+        motion_bucket_id: int,
     ) -> Dict[str, Any]:
+        """Build SVD workflow prompt."""
 
-        """🔥 Minimal & stable WAN2.2 recipe. No template required."""
-
-        node_id = "1"
-
-        # ComfyUI standard execution format
+        # SVD workflow nodes
         return {
             "prompt": {
-                node_id: {
-                    "class_type": "WAN2.2_I2V",
+                "1": {
+                    "class_type": "LoadImage",
                     "inputs": {
-                        "image": str(image_path),
-                        "camera_prompt": camera_prompt,
-                        "fps": fps,
-                        "seconds": duration_sec,
-                        "output_path": str(output_path.with_suffix("")),
+                        "image": str(image_path.name),
+                        "upload": "image",
                     },
-                }
+                },
+                "2": {
+                    "class_type": "SVD_img2vid_Conditioning",
+                    "inputs": {
+                        "width": 1024,
+                        "height": 576,
+                        "video_frames": num_frames,
+                        "motion_bucket_id": motion_bucket_id,
+                        "fps": fps,
+                        "augmentation_level": 0.0,
+                        "clip_vision": ["3", 0],
+                        "init_image": ["1", 0],
+                        "vae": ["4", 0],
+                    },
+                },
+                "3": {
+                    "class_type": "CLIPVisionLoader",
+                    "inputs": {
+                        "clip_name": "SD15/model.safetensors",
+                    },
+                },
+                "4": {
+                    "class_type": "VAELoader",
+                    "inputs": {
+                        "vae_name": "vae-ft-mse-840000-ema-pruned.safetensors",
+                    },
+                },
+                "5": {
+                    "class_type": "VideoLinearCFGGuidance",
+                    "inputs": {
+                        "min_cfg": 1.0,
+                        "conditioning": ["2", 0],
+                    },
+                },
+                "6": {
+                    "class_type": "KSamplerSelect",
+                    "inputs": {
+                        "sampler_name": "euler",
+                    },
+                },
+                "7": {
+                    "class_type": "KSampler",
+                    "inputs": {
+                        "seed": 42,
+                        "steps": 20,
+                        "cfg": 2.5,
+                        "sampler_name": "euler",
+                        "scheduler": "karras",
+                        "denoise": 1.0,
+                        "model": ["8", 0],
+                        "positive": ["5", 0],
+                        "negative": ["2", 1],
+                        "latent_image": ["2", 2],
+                    },
+                },
+                "8": {
+                    "class_type": "ImageOnlyCheckpointLoader",
+                    "inputs": {
+                        "ckpt_name": "svd_xt.safetensors",
+                    },
+                },
+                "9": {
+                    "class_type": "VAEDecode",
+                    "inputs": {
+                        "samples": ["7", 0],
+                        "vae": ["4", 0],
+                    },
+                },
+                "10": {
+                    "class_type": "VHS_VideoCombine",
+                    "inputs": {
+                        "frame_rate": fps,
+                        "format": "video/h264-mp4",
+                        "filename_prefix": str(output_path.with_suffix("").name),
+                        "images": ["9", 0],
+                    },
+                },
             }
         }
 
