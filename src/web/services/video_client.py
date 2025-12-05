@@ -148,8 +148,23 @@ class ComfyUIVideoClient:
     def _queue_prompt(self, workflow: Dict[str, Any]) -> str:
         prompt_id = str(uuid.uuid4())
         payload = {"prompt": workflow, "client_id": prompt_id}
-        response = requests.post(f"{self.server_url}/prompt", json=payload, timeout=30)
-        response.raise_for_status()
+
+        try:
+            response = requests.post(f"{self.server_url}/prompt", json=payload, timeout=30)
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            error_detail = ""
+            try:
+                error_data = response.json()
+                error_detail = f"\nComfyUI Error Details: {json.dumps(error_data, indent=2)}"
+            except Exception:
+                error_detail = f"\nResponse Text: {response.text}"
+
+            logger.error(f"Failed to queue workflow: {e}{error_detail}")
+            raise RuntimeError(
+                f"ComfyUI workflow validation failed (HTTP {response.status_code}): {error_detail}"
+            ) from e
+
         result = response.json()
         return result.get("prompt_id", prompt_id)
 

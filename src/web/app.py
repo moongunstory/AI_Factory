@@ -34,6 +34,7 @@ from src.web.services.pipeline import (
 )
 from src.web.services.comfy_client import ComfyUIClient
 from src.web.services.video_client import ComfyUIVideoClient
+from src.generators.llm import LlamaClient
 from src.common.config import Config
 
 logger = setup_logger(__name__)
@@ -811,6 +812,59 @@ def regenerate_images():
 # Video Generation APIs (ComfyUI WAN2.2 workflow)
 # ============================================================================
 
+def generate_camera_motion(scene_description: str, default: str = "cinematic movement") -> str:
+    """Generate camera motion prompt based on scene description using LLM.
+
+    Args:
+        scene_description: The scene description or prompt
+        default: Default camera motion if generation fails
+
+    Returns:
+        Camera motion prompt
+    """
+    if not scene_description:
+        return default
+
+    try:
+        llm = LlamaClient(temperature=0.7, max_tokens=100)
+
+        system_prompt = """You are a cinematography expert. Given a scene description, suggest an appropriate camera motion in 2-5 words.
+
+Examples:
+- Action scene → "fast tracking shot"
+- Quiet moment → "slow dolly forward"
+- Dramatic reveal → "crane up movement"
+- Dialogue → "static medium shot"
+- Chase scene → "handheld shaky cam"
+- Landscape → "slow panoramic sweep"
+
+Output ONLY the camera motion phrase, nothing else."""
+
+        user_prompt = f"Scene: {scene_description[:200]}\n\nCamera motion:"
+
+        response = llm.generate(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            temperature=0.7,
+            max_tokens=50
+        )
+
+        # Clean up response
+        camera_motion = response.strip().replace('"', '').replace("'", '').lower()
+
+        # Validate response (should be short)
+        if len(camera_motion) > 50 or '\n' in camera_motion:
+            logger.warning(f"Invalid camera motion generated: {camera_motion[:50]}, using default")
+            return default
+
+        logger.info(f"Generated camera motion: {camera_motion}")
+        return camera_motion
+
+    except Exception as e:
+        logger.warning(f"Failed to generate camera motion: {e}, using default")
+        return default
+
+
 @app.route('/api/generate-videos', methods=['POST'])
 def generate_videos():
     """Generate videos from images using ComfyUI WAN2.2 workflow."""
@@ -843,7 +897,15 @@ def generate_videos():
         for i, video_req in enumerate(video_requests, 1):
             scene_number = video_req.get('scene_number')
             image_path = project_root / video_req.get('image_path')
-            video_prompt = video_req.get('video_prompt', default_camera)
+            scene_description = video_req.get('scene_description', '')
+
+            # Auto-generate camera motion using LLM if no video_prompt provided
+            video_prompt_input = video_req.get('video_prompt', '')
+            if not video_prompt_input or video_prompt_input == default_camera:
+                video_prompt = generate_camera_motion(scene_description, default_camera)
+            else:
+                video_prompt = video_prompt_input
+
             duration = float(video_req.get('duration', default_duration) or default_duration)
             fps = int(video_req.get('fps', default_fps) or default_fps)
 
