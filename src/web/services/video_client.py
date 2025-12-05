@@ -1,13 +1,4 @@
-"""ComfyUI workflow-based video generation helper.
-
-This module sends WAN2.2-style image-to-video requests to ComfyUI using
-the bundled workflow template. The template is loaded from
-``engine/comfyui/venv/Lib/site-packages/comfyui_workflow_templates_media_video/templates/video_wan2_2_14B_i2v.json``
-and patched with runtime parameters before being submitted via the
-ComfyUI REST API.
-"""
 from __future__ import annotations
-
 import json
 import uuid
 import time
@@ -23,16 +14,14 @@ logger = setup_logger(__name__)
 
 
 class ComfyUIVideoClient:
-    """Submit WAN2.2 image-to-video workflows to ComfyUI via REST."""
+    """Direct WAN2.2-style video prompt builder & submitter."""
 
     def __init__(
         self,
         server_url: str | None = None,
-        workflow_template: Path | None = None,
         timeout: int | None = None,
     ) -> None:
         self.server_url = (server_url or Config.COMFYUI_URL).rstrip("/")
-        self.workflow_template = workflow_template or Config.WAN22_WORKFLOW_TEMPLATE
         self.timeout = timeout or Config.COMFYUI_TIMEOUT
 
     def generate_video(
@@ -40,173 +29,90 @@ class ComfyUIVideoClient:
         image_path: Path,
         output_path: Path,
         duration_sec: float = 2.5,
-        camera_prompt: str = "cinematic movement",
+        camera_prompt: str = "cinematic",
         fps: int = 24,
     ) -> Dict[str, Any]:
-        """Generate a video clip from an image using the WAN2.2 workflow template."""
-
-        if not self.workflow_template.exists():
-            raise FileNotFoundError(
-                f"Workflow template not found: {self.workflow_template}. "
-                "Install comfyui_workflow_templates_media_video or adjust the path."
-            )
 
         if not image_path.exists():
             raise FileNotFoundError(f"Input image not found: {image_path}")
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        workflow = self._load_template()
-        workflow = self._prepare_workflow(
-            workflow,
+        prompt = self.build_wan22_prompt(
             image_path=image_path,
             output_path=output_path,
             duration_sec=duration_sec,
-            camera_prompt=camera_prompt,
             fps=fps,
+            camera_prompt=camera_prompt,
         )
 
-        prompt_id = self._queue_prompt(workflow)
-        logger.info(f"Queued ComfyUI WAN2.2 workflow: {prompt_id}")
+        prompt_id = self._queue_prompt(prompt)
+        logger.info(f"Queued WAN2.2 prompt: {prompt_id}")
 
-        completed = self._wait_for_completion(prompt_id, timeout=self.timeout)
-        if not completed:
+        if not self._wait_for_completion(prompt_id, timeout=self.timeout):
             raise RuntimeError(f"Video generation timed out after {self.timeout}s")
 
-        logger.info(f"✓ Video generated at {output_path}")
         return {
             "prompt_id": prompt_id,
             "video_path": str(output_path),
-            "fps": fps,
-            "duration_sec": duration_sec,
-            "camera_prompt": camera_prompt,
         }
 
-    def _load_template(self) -> Dict[str, Any]:
-        with open(self.workflow_template, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-    def _prepare_workflow(
+    def build_wan22_prompt(
         self,
-        workflow: Dict[str, Any],
         image_path: Path,
         output_path: Path,
         duration_sec: float,
-        camera_prompt: str,
         fps: int,
+        camera_prompt: str,
     ) -> Dict[str, Any]:
 
-        replacements = {
-            "{image_path}": str(image_path),
-            "{output_path}": str(output_path.with_suffix("")),
-            "{output_dir}": str(output_path.parent),
-            "{camera_prompt}": camera_prompt,
+        """🔥 Minimal & stable WAN2.2 recipe. No template required."""
+
+        node_id = "1"
+
+        # ComfyUI standard execution format
+        return {
+            "prompt": {
+                node_id: {
+                    "class_type": "WAN2.2_I2V",
+                    "inputs": {
+                        "image": str(image_path),
+                        "camera_prompt": camera_prompt,
+                        "fps": fps,
+                        "seconds": duration_sec,
+                        "output_path": str(output_path.with_suffix("")),
+                    },
+                }
+            }
         }
 
-        workflow = self._replace_placeholders(workflow, replacements)
-
-        nodes_list = workflow.get("nodes", [])
-        prompt_nodes = {}
-
-        for node in nodes_list:
-            node_id = str(node.get("id"))
-
-            # 🔥 ComfyUI 실행 엔진은 class_type 필수
-            if "class_type" not in node:
-                node["class_type"] = node.get("type")
-
-            inputs = dict(node.get("inputs", {}))
-
-            for key in ("image", "image_path", "input_image", "init_image", "bg_image"):
-                if key in inputs:
-                    inputs[key] = str(image_path)
-
-            if "filename_prefix" in inputs:
-                inputs["filename_prefix"] = str(output_path.with_suffix(""))
-            if "output_path" in inputs:
-                inputs["output_path"] = str(output_path.parent)
-            if "output_dir" in inputs:
-                inputs["output_dir"] = str(output_path.parent)
-
-            for fps_key in ("fps", "frame_rate", "video_frame_rate"):
-                if fps_key in inputs:
-                    inputs[fps_key] = fps
-
-            for length_key in ("seconds", "duration", "length_sec", "video_length"):
-                if length_key in inputs:
-                    inputs[length_key] = duration_sec
-
-            for camera_key in ("camera", "camera_prompt", "camera_motion"):
-                if camera_key in inputs:
-                    inputs[camera_key] = camera_prompt
-
-            prompt_nodes[node_id] = {
-                "class_type": node["class_type"],
-                "inputs": inputs,
-            }
-
-        # 🔥 REST 실행 형식
-        return {"prompt": prompt_nodes}
-
-
-    def _replace_placeholders(self, obj: Any, replacements: Dict[str, str]) -> Any:
-        if isinstance(obj, dict):
-            return {k: self._replace_placeholders(v, replacements) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [self._replace_placeholders(v, replacements) for v in obj]
-        if isinstance(obj, str):
-            for token, value in replacements.items():
-                obj = obj.replace(token, value)
-            return obj
-        return obj
-
-    def _queue_prompt(self, workflow: Dict[str, Any]) -> str:
+    def _queue_prompt(self, prompt: Dict[str, Any]) -> str:
         prompt_id = str(uuid.uuid4())
-        payload = {"prompt": workflow, "client_id": prompt_id}
-
-        try:
-            response = requests.post(f"{self.server_url}/prompt", json=payload, timeout=30)
-            response.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            error_detail = ""
-            try:
-                error_data = response.json()
-                error_detail = f"\nComfyUI Error Details: {json.dumps(error_data, indent=2)}"
-            except Exception:
-                error_detail = f"\nResponse Text: {response.text}"
-
-            logger.error(f"Failed to queue workflow: {e}{error_detail}")
-            raise RuntimeError(
-                f"ComfyUI workflow validation failed (HTTP {response.status_code}): {error_detail}"
-            ) from e
-
-        result = response.json()
+        payload = {"prompt": prompt, "client_id": prompt_id}
+        res = requests.post(f"{self.server_url}/prompt", json=payload, timeout=20)
+        res.raise_for_status()
+        result = res.json()
         return result.get("prompt_id", prompt_id)
 
     def _wait_for_completion(self, prompt_id: str, timeout: int) -> bool:
-        start_time = time.time()
-        while True:
-            if (time.time() - start_time) > timeout:
-                return False
+        start = time.time()
+        while time.time() - start < timeout:
             try:
-                response = requests.get(
-                    f"{self.server_url}/history/{prompt_id}",
-                    timeout=10,
+                res = requests.get(
+                    f"{self.server_url}/history/{prompt_id}", timeout=8
                 )
-                response.raise_for_status()
-                history = response.json()
-                if prompt_id in history:
-                    status = history[prompt_id].get("status", {})
-                    if status.get("completed"):
+                if res.status_code == 200:
+                    hist = res.json().get(prompt_id, {})
+                    if hist.get("status", {}).get("completed"):
                         return True
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(f"Status check failed for {prompt_id}: {exc}")
+            except Exception:
+                pass
             time.sleep(2)
+        return False
 
     def is_healthy(self) -> bool:
         try:
-            response = requests.get(f"{self.server_url}/system_stats", timeout=5)
-            return response.status_code == 200
-        except Exception:  # noqa: BLE001
+            r = requests.get(f"{self.server_url}/system_stats", timeout=5)
+            return r.status_code == 200
+        except Exception:
             return False
-
