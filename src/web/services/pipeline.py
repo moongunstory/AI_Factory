@@ -27,6 +27,52 @@ logger = setup_logger(__name__)
 _current_pipeline_state: Optional[Dict[str, Any]] = None
 
 
+# ====================================================================
+# Rule Table for WAN2.2 Video Generation Parameters
+# ====================================================================
+VIDEO_PARAMS_RULE_TABLE = {
+    "CHARACTER": {"camera_prompt": "static", "fps": 15, "duration_sec": 4.0},
+    "ACTION": {"camera_prompt": "forward", "fps": 20, "duration_sec": 5.0},
+    "LANDSCAPE": {"camera_prompt": "orbit", "fps": 12, "duration_sec": 3.0},
+    "DIALOG": {"camera_prompt": "static", "fps": 12, "duration_sec": 3.0},
+}
+
+
+def infer_scene_type(prompt: str) -> str:
+    """Infer scene type from prompt text using keyword matching.
+
+    Args:
+        prompt: Image or video prompt text
+
+    Returns:
+        Scene type: "ACTION", "CHARACTER", "LANDSCAPE", or "DIALOG"
+    """
+    prompt_lower = prompt.lower()
+
+    # Check for ACTION keywords
+    action_keywords = ["run", "fight", "chase", "attack", "jump", "explosion"]
+    if any(keyword in prompt_lower for keyword in action_keywords):
+        return "ACTION"
+
+    # Check for CHARACTER keywords
+    character_keywords = ["face", "eyes", "emotion", "close-up"]
+    if any(keyword in prompt_lower for keyword in character_keywords):
+        return "CHARACTER"
+
+    # Check for LANDSCAPE keywords
+    landscape_keywords = ["city", "forest", "sky", "street", "mountain"]
+    if any(keyword in prompt_lower for keyword in landscape_keywords):
+        return "LANDSCAPE"
+
+    # Check for DIALOG keywords
+    dialog_keywords = ["dialog", "say", "talk", "conversation"]
+    if any(keyword in prompt_lower for keyword in dialog_keywords):
+        return "DIALOG"
+
+    # Default to CHARACTER if no keywords match
+    return "CHARACTER"
+
+
 class PipelineStatus:
     """Pipeline status constants."""
     PENDING = "pending"
@@ -245,12 +291,27 @@ def generate_short(
             )
 
             try:
+                # Infer scene type from image prompt
+                image_prompt = scene_info.get("image_prompt", "")
+                scene_type = infer_scene_type(image_prompt)
+
+                # Get video parameters from Rule Table
+                video_params = VIDEO_PARAMS_RULE_TABLE[scene_type]
+                camera_prompt = video_params["camera_prompt"]
+                fps = video_params["fps"]
+                duration_sec = video_params["duration_sec"]
+
+                logger.info(
+                    f"Scene {scene_id} type: {scene_type} "
+                    f"(camera={camera_prompt}, fps={fps}, duration={duration_sec}s)"
+                )
+
                 video_client.generate_video(
                     image_path=image_path,
                     output_path=video_path,
-                    duration_sec=scene_info["duration_sec"],
-                    fps=24,
-                    camera_prompt=scene_info["video_prompt"],
+                    duration_sec=duration_sec,
+                    fps=fps,
+                    camera_prompt=camera_prompt,
                 )
 
                 scene_info["video_path"] = str(video_path.relative_to(project_root))
