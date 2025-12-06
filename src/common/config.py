@@ -40,6 +40,8 @@ class Config:
     COMFYUI_HOST = os.getenv("COMFYUI_HOST", "127.0.0.1")
     COMFYUI_PORT = int(os.getenv("COMFYUI_PORT", "8188"))
     COMFYUI_URL = f"http://{COMFYUI_HOST}:{COMFYUI_PORT}"
+    COMFYUI_ROOT = Path(os.getenv("COMFYUI_ROOT", str(ENGINE_DIR / "comfyui")))
+    COMFYUI_INPUT_DIR = COMFYUI_ROOT / "input"
     WAN22_WORKFLOW_TEMPLATE = (
         ROOT_DIR
         / "engine"

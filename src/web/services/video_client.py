@@ -85,28 +85,26 @@ class ComfyUIVideoClient:
         output_path: Path,
         num_frames: int,
         fps: int,
-        motion_bucket_id: int,   # 현재는 SVD 워크플로에서 안 씀 (자리 유지용)
-        camera_prompt: str,      # LLM/다중 레이어에서 만든 연출 프롬프트
+        motion_bucket_id: int,
+        camera_prompt: str,
     ) -> Dict[str, Any]:
         """
-        Stable Video Diffusion 정식 워크플로(svd_mp4.json) 기반으로
-        ComfyUI /prompt 에 바로 보낼 수 있는 그래프를 만든다.
+        Stable Video Diffusion workflow
+        VIDEO_USE_UPSCALE=true -> low-res generation + upscale
 
-        1) svd_mp4.json 불러오기
-        2) __INPUT_IMAGE__, __CAMERA_PROMPT__, __FPS__, __OUTNAME__ 치환
-        3) JSON의 nodes/links 구조를 ComfyUI API 형식으로 변환:
-           {"1": {"class_type": "...", "inputs": {...}}, ...}
+        IMPORTANT: This workflow uses SVD_img2vid_Conditioning which outputs
+        video-compatible conditioning tensors. The KSampler must be able to
+        handle video latents (may be 5D: batch, time, channels, height, width).
+
+        NOTE: camera_prompt is used to select motion_bucket_id mapping.
+        SVD does not use CLIP text encoding.
         """
 
-        import json
+        # Copy image to ComfyUI input folder
         import shutil
 
-        # 1) ComfyUI input 폴더로 이미지 복사
-        comfyui_root = Path(
-            "C:/Users/moong/Desktop/Project/AI_shorts_factory/engine/comfyui"
-        )
-        comfyui_input = comfyui_root / "input"
-        comfyui_input.mkdir(exist_ok=True)
+        comfyui_input = Config.COMFYUI_INPUT_DIR
+        comfyui_input.mkdir(parents=True, exist_ok=True)
 
         target_image = comfyui_input / image_path.name
         shutil.copy2(image_path, target_image)
@@ -114,112 +112,148 @@ class ComfyUIVideoClient:
         image_name = image_path.name
         out_prefix = output_path.with_suffix("").name
 
-        # 2) SVD 워크플로 JSON 로드
-        workflow_path = comfyui_root / "workflows" / "svd_mp4.json"
-        if not workflow_path.exists():
-            raise FileNotFoundError(f"SVD workflow JSON not found: {workflow_path}")
+        # Resolution settings: use low-res for upscale strategy
+        if Config.VIDEO_USE_UPSCALE:
+            base_width = Config.VIDEO_BASE_WIDTH
+            base_height = Config.VIDEO_BASE_HEIGHT
+            target_width = Config.VIDEO_TARGET_WIDTH
+            target_height = Config.VIDEO_TARGET_HEIGHT
+            use_upscale = True
+            logger.info(f"Using low-res + upscale strategy: {base_width}x{base_height} → {target_width}x{target_height}")
+        else:
+            base_width = Config.VIDEO_TARGET_WIDTH
+            base_height = Config.VIDEO_TARGET_HEIGHT
+            use_upscale = False
+            logger.info(f"Using direct generation: {base_width}x{base_height}")
 
-        with workflow_path.open("r", encoding="utf-8") as f:
-            workflow_json = json.load(f)
-
-        nodes = workflow_json.get("nodes", [])
-        links_list = workflow_json.get("links", [])
-
-        # link_id → (from_id, from_slot, to_id, to_slot) 매핑 구성
-        link_map = {}
-        for link in links_list:
-            # [link_id, from_id, from_slot, to_id, to_slot]
-            if len(link) >= 5:
-                link_id, from_id, from_slot, to_id, to_slot = link[:5]
-                link_map[link_id] = (from_id, from_slot, to_id, to_slot)
-
-        # 3) 플레이스홀더 치환 (노드 레벨)
-        for node in nodes:
-            ntype = node.get("type")
-
-            # LoadImage: 입력 이미지 파일명 치환
-            if ntype == "LoadImage":
-                widgets = node.get("widgets_values", [])
-                if widgets:
-                    # ["__INPUT_IMAGE__", "image"] 형태
-                    widgets[0] = image_name
-                    node["widgets_values"] = widgets
-
-            # CLIPTextEncode: 카메라/연출 프롬프트 치환
-            elif ntype == "CLIPTextEncode":
-                widgets = node.get("widgets_values", [])
-                if widgets:
-                    # ["__CAMERA_PROMPT__"]
-                    widgets[0] = camera_prompt
-                    node["widgets_values"] = widgets
-
-            # VHS_VideoCombine: fps / 출력 파일 prefix 치환
-            elif ntype == "VHS_VideoCombine":
-                widgets = node.get("widgets_values", {})
-                # 이 노드는 widgets_values가 dict 형태
-                if isinstance(widgets, dict):
-                    widgets["frame_rate"] = fps
-                    widgets["filename_prefix"] = out_prefix
-                    node["widgets_values"] = widgets
-
-        # 4) ComfyUI /prompt 형식으로 변환
-        prompt_graph: Dict[str, Any] = {}
-
-        for node in nodes:
-            node_id = node["id"]
-            node_type = node["type"]
-            node_inputs_list = node.get("inputs", [])
-
-            # 기본 연결: links 정보를 사용해 입력 간선 구성
-            inputs_dict: Dict[str, Any] = {}
-
-            for inp in node_inputs_list:
-                inp_name = inp.get("name")
-                link_id = inp.get("link")
-                if inp_name is None:
-                    continue
-                if link_id is not None and link_id in link_map:
-                    from_id, from_slot, _, _ = link_map[link_id]
-                    inputs_dict[inp_name] = [str(from_id), from_slot]
-
-            # 타입별로 우리가 직접 넣어야 하는 파라미터들 override
-
-            # LoadImage: image 파일경로 직접 지정
-            if node_type == "LoadImage":
-                inputs_dict = {
+        # Build SVD workflow
+        # Note: SVD_img2vid_Conditioning outputs video-compatible tensors
+        # Some ComfyUI versions require VideoLinearCFGGuidance between model and sampler
+        workflow = {
+            "1": {
+                "class_type": "LoadImage",
+                "inputs": {
                     "image": image_name,
-                }
+                },
+            },
+            "2": {
+                "class_type": "SVD_img2vid_Conditioning",
+                "inputs": {
+                    "width": base_width,
+                    "height": base_height,
+                    "video_frames": num_frames,
+                    "motion_bucket_id": motion_bucket_id,
+                    "fps": fps,
+                    "augmentation_level": 0.0,
+                    "clip_vision": ["3", 0],
+                    "init_image": ["1", 0],
+                    "vae": ["4", 0],
+                },
+            },
+            "3": {
+                "class_type": "CLIPVisionLoader",
+                "inputs": {
+                    "clip_name": "model.safetensors",
+                },
+            },
+            "4": {
+                "class_type": "VAELoader",
+                "inputs": {
+                    "vae_name": "wan2.2_vae.safetensors",
+                },
+            },
+            "5": {
+                "class_type": "ImageOnlyCheckpointLoader",
+                "inputs": {
+                    "ckpt_name": "svd.safetensors",
+                },
+            },
+            # Try using VideoLinearCFGGuidance to handle video tensors properly
+            # This node adapts the model to work with video conditioning
+            "5a": {
+                "class_type": "VideoLinearCFGGuidance",
+                "inputs": {
+                    "model": ["5", 0],
+                    "min_cfg": 1.0,
+                },
+            },
+            "6": {
+                "class_type": "KSampler",
+                "inputs": {
+                    "seed": 42,
+                    "steps": 20,
+                    "cfg": 2.5,
+                    "sampler_name": "euler",
+                    "scheduler": "karras",
+                    "denoise": 1.0,
+                    "model": ["5a", 0],  # Use guided model instead of raw model
+                    "positive": ["2", 0],
+                    "negative": ["2", 1],
+                    "latent_image": ["2", 2],
+                },
+            },
+        }
 
-            # CLIPTextEncode: text 인자로 카메라/연출 프롬프트 넣기
-            elif node_type == "CLIPTextEncode":
-                inputs_dict = {
-                    "text": camera_prompt,
-                }
+        logger.debug(f"SVD workflow nodes: LoadImage → SVD_Conditioning → VideoLinearCFGGuidance → KSampler")
 
-            # VHS_VideoCombine: images 연결 + fps/filename_prefix 등 세팅
-            elif node_type == "VHS_VideoCombine":
-                # 위에서 links 기반으로 만든 images 연결 유지
-                # (보통 inputs_dict["images"] 가 이미 세팅돼 있음)
-                inputs_dict["frame_rate"] = fps
-                inputs_dict["loop_count"] = 0
-                inputs_dict["filename_prefix"] = out_prefix
-                inputs_dict["format"] = "video/mp4"
-                # 필요하면 나중에 crf, save_metadata 등도 여기서 조정 가능
+        if use_upscale:
+            # 저해상도 + 업스케일 워크플로우
+            upscale_factor = target_width / base_width
 
-            # 최종 노드 정의 작성
-            prompt_graph[str(node_id)] = {
-                "class_type": node_type,
-                "inputs": inputs_dict,
-            }
+            workflow.update({
+                "7": {
+                    "class_type": "LatentUpscaleBy",
+                    "inputs": {
+                        "samples": ["6", 0],
+                        "scale_by": upscale_factor,
+                        "upscale_method": "bicubic",  # bicubic, nearest, bilinear, bislerp
+                    },
+                },
+                "8": {
+                    "class_type": "VAEDecode",
+                    "inputs": {
+                        "samples": ["7", 0],
+                        "vae": ["4", 0],
+                    },
+                },
+                "9": {
+                    "class_type": "VHS_VideoCombine",
+                    "inputs": {
+                        "frame_rate": fps,
+                        "loop_count": 0,
+                        "filename_prefix": out_prefix,
+                        "format": "video/h264-mp4",
+                        "pingpong": False,
+                        "save_output": True,
+                        "images": ["8", 0],
+                    },
+                },
+            })
+        else:
+            # 기본 워크플로우 (업스케일 없음)
+            workflow.update({
+                "7": {
+                    "class_type": "VAEDecode",
+                    "inputs": {
+                        "samples": ["6", 0],
+                        "vae": ["4", 0],
+                    },
+                },
+                "8": {
+                    "class_type": "VHS_VideoCombine",
+                    "inputs": {
+                        "frame_rate": fps,
+                        "loop_count": 0,
+                        "filename_prefix": out_prefix,
+                        "format": "video/h264-mp4",
+                        "pingpong": False,
+                        "save_output": True,
+                        "images": ["7", 0],
+                    },
+                },
+            })
 
-        logger.debug(
-            f"SVD workflow (svd_mp4.json 기반) 준비 완료: "
-            f"image={image_name}, fps={fps}, out_prefix={out_prefix}, "
-            f"camera_prompt={camera_prompt}"
-        )
-
-        # ✅ 이제는 ComfyUI가 기대하는 형태의 그래프만 리턴
-        return prompt_graph
+        return workflow
 
     def _queue_prompt(self, prompt_graph: Dict[str, Any]) -> str:
         """
