@@ -1,0 +1,57 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "__INPUT_IMAGE__"
+    }
+  },
+  "2": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "__CAMERA_PROMPT__"
+    }
+  },
+  "3": {
+    "class_type": "SVDModelLoader",
+    "inputs": {
+      "ckpt_name": "svd.safetensors",
+      "frames": 14,
+      "steps": 25,
+      "device": "cuda"
+    }
+  },
+  "4": {
+    "class_type": "SVDSampler",
+    "inputs": {
+      "image": ["1", 0],
+      "conditioning": ["2", 0],
+      "model": ["3", 0],
+      "frames": 16,
+      "width": 16,
+      "motion_bucket_id": 0.02,
+      "height": 720,
+      "device": "cuda"
+    }
+  },
+  "5": {
+    "class_type": "SVDDecoder",
+    "inputs": {
+      "samples": ["4", 0],
+      "model": ["3", 0],
+      "frames": 14,
+      "device": "cuda"
+    }
+  },
+  "6": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": ["5", 0],
+      "frame_rate": "__FPS__",
+      "loop_count": 0,
+      "filename_prefix": "__OUTNAME__",
+      "format": "video/mp4",
+      "crf": 20,
+      "save_metadata": false
+    }
+  }
+}
