@@ -56,8 +56,15 @@ class Config:
     COMFYUI_LOW_VRAM = os.getenv("COMFYUI_LOW_VRAM", "true").lower() == "true"
     COMFYUI_USE_REFINER = os.getenv("COMFYUI_USE_REFINER", "false").lower() == "true"  # Refiner는 기본적으로 비활성화
     COMFYUI_RESOLUTION_MODE = os.getenv("COMFYUI_RESOLUTION_MODE", "low")  # "low" (768px) or "high" (1080px)
-    COMFYUI_TIMEOUT = int(os.getenv("COMFYUI_TIMEOUT", "240"))  # 240초 (4분)
+    COMFYUI_TIMEOUT = int(os.getenv("COMFYUI_TIMEOUT", "0"))  # 0 = 무제한 (타임아웃 없음)
     COMFYUI_MAX_RETRIES = int(os.getenv("COMFYUI_MAX_RETRIES", "2"))  # 최대 재시도 횟수
+
+    # Video generation optimization settings
+    VIDEO_USE_UPSCALE = os.getenv("VIDEO_USE_UPSCALE", "true").lower() == "true"  # 저해상도 + 업스케일 전략
+    VIDEO_BASE_WIDTH = int(os.getenv("VIDEO_BASE_WIDTH", "512"))  # 기본 생성 해상도 (낮은 해상도로 빠른 생성)
+    VIDEO_BASE_HEIGHT = int(os.getenv("VIDEO_BASE_HEIGHT", "288"))  # 16:9 비율 유지
+    VIDEO_TARGET_WIDTH = int(os.getenv("VIDEO_TARGET_WIDTH", "1024"))  # 최종 타겟 해상도
+    VIDEO_TARGET_HEIGHT = int(os.getenv("VIDEO_TARGET_HEIGHT", "576"))  # 16:9 비율 유지
 
     # Image generation parameters (optimized for stability)
     IMAGE_STEPS_MIN = int(os.getenv("IMAGE_STEPS_MIN", "28"))
