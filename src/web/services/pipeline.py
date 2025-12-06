@@ -15,6 +15,7 @@ from typing import Dict, Any, List, Optional, Callable
 from datetime import datetime
 
 from .llama_client import LlamaStoryClient
+from .integrated_story_client import IntegratedStoryClient
 from .comfy_client import ComfyUIClient
 from .video_client import ComfyUIVideoClient
 from src.common.logger import setup_logger
@@ -173,12 +174,15 @@ def generate_short(
         final_dir.mkdir(parents=True, exist_ok=True)
 
         # ====================================================================
-        # Step 1: Generate story breakdown
+        # Step 1: Generate story breakdown with multi-layer pipeline
         # ====================================================================
         update_state(PipelineStatus.GENERATING_STORY, 10, "Generating story & scene breakdown...")
 
-        llama_client = LlamaStoryClient()
-        story_data = llama_client.generate_story_breakdown(
+        # Use IntegratedStoryClient for multi-layer prompt generation
+        # This includes: story expansion, character extraction, film layer,
+        # camera layer, and character/world injection into prompts
+        story_client = IntegratedStoryClient()
+        story_data = story_client.generate_story_breakdown(
             theme=theme,
             style=style,
             scene_count=scene_count,
@@ -188,8 +192,9 @@ def generate_short(
         state["title"] = story_data["title"]
         state["synopsis"] = story_data["synopsis"]
 
-        logger.info(f"✓ Story generated: '{story_data['title']}'")
+        logger.info(f"✓ Story generated with multi-layer pipeline: '{story_data['title']}'")
         logger.info(f"  Scenes: {len(story_data['scenes'])}")
+        logger.info(f"  Theme: {theme}, Style: {style}")
 
         # ====================================================================
         # Step 2: Generate images for each scene
@@ -483,8 +488,8 @@ def check_engines_health() -> Dict[str, bool]:
     }
 
     try:
-        llama_client = LlamaStoryClient()
-        health["llama_server"] = llama_client.is_healthy()
+        story_client = IntegratedStoryClient()
+        health["llama_server"] = story_client.is_healthy()
     except Exception as e:
         logger.warning(f"llama-server health check failed: {e}")
 

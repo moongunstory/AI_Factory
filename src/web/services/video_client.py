@@ -87,11 +87,15 @@ class ComfyUIVideoClient:
         motion_bucket_id: int,
     ) -> Dict[str, Any]:
         """
-        Stable Video Diffusion 워크플로우
-        VIDEO_USE_UPSCALE=true이면 저해상도 생성 후 업스케일
+        Stable Video Diffusion workflow
+        VIDEO_USE_UPSCALE=true -> low-res generation + upscale
+
+        IMPORTANT: This workflow uses SVD_img2vid_Conditioning which outputs
+        video-compatible conditioning tensors. The KSampler must be able to
+        handle video latents (may be 5D: batch, time, channels, height, width).
         """
 
-        # 이미지를 ComfyUI input 폴더로 복사
+        # Copy image to ComfyUI input folder
         import shutil
         comfyui_input = Path("C:/Users/moong/Desktop/Project/AI_shorts_factory/engine/comfyui/input")
         comfyui_input.mkdir(exist_ok=True)
@@ -102,7 +106,7 @@ class ComfyUIVideoClient:
         image_name = image_path.name
         out_prefix = output_path.with_suffix("").name
 
-        # 해상도 설정: 업스케일 사용 시 저해상도로 시작
+        # Resolution settings: use low-res for upscale strategy
         if Config.VIDEO_USE_UPSCALE:
             base_width = Config.VIDEO_BASE_WIDTH
             base_height = Config.VIDEO_BASE_HEIGHT
@@ -116,6 +120,9 @@ class ComfyUIVideoClient:
             use_upscale = False
             logger.info(f"Using direct generation: {base_width}x{base_height}")
 
+        # Build SVD workflow
+        # Note: SVD_img2vid_Conditioning outputs video-compatible tensors
+        # Some ComfyUI versions require VideoLinearCFGGuidance between model and sampler
         workflow = {
             "1": {
                 "class_type": "LoadImage",
@@ -155,6 +162,15 @@ class ComfyUIVideoClient:
                     "ckpt_name": "svd.safetensors",
                 },
             },
+            # Try using VideoLinearCFGGuidance to handle video tensors properly
+            # This node adapts the model to work with video conditioning
+            "5a": {
+                "class_type": "VideoLinearCFGGuidance",
+                "inputs": {
+                    "model": ["5", 0],
+                    "min_cfg": 1.0,
+                },
+            },
             "6": {
                 "class_type": "KSampler",
                 "inputs": {
@@ -164,13 +180,15 @@ class ComfyUIVideoClient:
                     "sampler_name": "euler",
                     "scheduler": "karras",
                     "denoise": 1.0,
-                    "model": ["5", 0],
+                    "model": ["5a", 0],  # Use guided model instead of raw model
                     "positive": ["2", 0],
                     "negative": ["2", 1],
                     "latent_image": ["2", 2],
                 },
             },
         }
+
+        logger.debug(f"SVD workflow nodes: LoadImage → SVD_Conditioning → VideoLinearCFGGuidance → KSampler")
 
         if use_upscale:
             # 저해상도 + 업스케일 워크플로우
@@ -233,8 +251,11 @@ class ComfyUIVideoClient:
 
     def _queue_prompt(self, prompt_graph: Dict[str, Any]) -> str:
         """
-        ComfyUI /prompt 호출.
-        prompt_graph: 위 build_svd_prompt가 반환한 '노드ID → 노드 정의' dict.
+        Queue prompt to ComfyUI /prompt endpoint.
+        prompt_graph: Node ID → Node definition dict from build_svd_prompt.
+
+        Raises:
+            RuntimeError: If ComfyUI rejects the workflow (e.g., missing custom nodes)
         """
         client_id = str(uuid.uuid4())
         payload = {
@@ -248,19 +269,49 @@ class ComfyUIVideoClient:
             timeout=20,
         )
 
-        # 여기서 400/500 같은 HTTP 에러가 나면 그대로 raise 해서 위에서 잡음
+        # Check for HTTP errors
         try:
             res.raise_for_status()
         except Exception:
+            error_body = res.text
             logger.error(
                 "ComfyUI /prompt HTTP error: %s\nBody: %s",
                 res.status_code,
-                res.text,
+                error_body,
             )
-            raise
+
+            # Provide helpful diagnostics for common errors
+            if "VideoLinearCFGGuidance" in error_body:
+                raise RuntimeError(
+                    "ComfyUI missing 'VideoLinearCFGGuidance' custom node. "
+                    "This is required for SVD video generation. "
+                    "Please install ComfyUI custom nodes for Stable Video Diffusion. "
+                    f"Original error: {error_body}"
+                )
+            elif "SVD_img2vid_Conditioning" in error_body:
+                raise RuntimeError(
+                    "ComfyUI missing 'SVD_img2vid_Conditioning' node. "
+                    "Please install ComfyUI SVD custom nodes. "
+                    f"Original error: {error_body}"
+                )
+            elif "dimension" in error_body.lower() or "tensor" in error_body.lower():
+                raise RuntimeError(
+                    "ComfyUI tensor dimension mismatch. "
+                    "This usually means your ComfyUI/SVD version is incompatible. "
+                    f"Original error: {error_body}"
+                )
+            else:
+                raise RuntimeError(f"ComfyUI workflow validation failed: {error_body}")
 
         result = res.json()
-        # ComfyUI가 돌려주는 prompt_id 사용 (없으면 client_id 그대로)
+
+        # Check if ComfyUI returned an error in the JSON response
+        if "error" in result:
+            error_msg = result["error"]
+            logger.error(f"ComfyUI workflow error: {error_msg}")
+            raise RuntimeError(f"ComfyUI workflow error: {error_msg}")
+
+        # Return prompt_id (use client_id as fallback)
         return result.get("prompt_id", client_id)
 
     def _wait_for_completion(self, prompt_id: str, timeout: int) -> bool:
