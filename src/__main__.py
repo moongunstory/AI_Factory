@@ -1,11 +1,27 @@
-"""Main CLI entry point for AI Short Factory."""
+"""Main CLI entry point for AI Short Factory.
+
+DEPRECATION WARNING:
+This CLI interface uses the old advanced_scene_generator module which has been
+replaced by the multi-layer pipeline (IntegratedStoryClient).
+
+This module is kept for backward compatibility but may not work correctly.
+Please use the web UI or update this CLI to use IntegratedStoryClient.
+"""
 import argparse
 import sys
 import json
 from pathlib import Path
 from datetime import datetime
 
-from .pipeline.advanced_scene_generator import generate_advanced_scenes
+# WARNING: advanced_scene_generator module no longer exists
+# This import will fail - CLI needs to be updated to use IntegratedStoryClient
+try:
+    from .pipeline.advanced_scene_generator import generate_advanced_scenes
+except ImportError:
+    print("ERROR: CLI is deprecated. advanced_scene_generator module removed.")
+    print("Please use the web UI instead: python -m src.web.app")
+    sys.exit(1)
+
 from .pipeline.scene_formatter import SceneFormatter
 from .pipeline.visual_styles import VisualStyleDefinitions
 from .common.logger import setup_logger
