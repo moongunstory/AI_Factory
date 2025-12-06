@@ -1,8 +1,17 @@
-"""Prompt generation module - converts stories into Stable Diffusion prompts."""
+"""Prompt generation module - converts stories into Stable Diffusion prompts.
+
+This module implements a multi-layer prompt generation pipeline:
+1. Story Layer: Summarizes story into plot beats
+2. Film Layer: Analyzes emotion and applies cinematic grammar
+3. Camera Layer: Assigns specific camera techniques
+4. Prompt Layer: Builds final prompts with all layers integrated
+"""
 import re
 from typing import List, Dict, Any, Optional, Union
 from ..generators.llm import LlamaClient
 from ..common.logger import setup_logger
+from .film_layer import FilmLayer
+from .camera_layer import CameraLayer
 
 logger = setup_logger(__name__)
 
@@ -78,40 +87,67 @@ Content Guidelines:
 
 REMEMBER: Output ONLY the JSON object. Nothing else."""
 
-    def __init__(self, llm_client: Optional[LlamaClient] = None):
+    def __init__(
+        self,
+        llm_client: Optional[LlamaClient] = None,
+        enable_film_layer: bool = True,
+        enable_camera_layer: bool = True
+    ):
         """Initialize the prompt generator.
 
         Args:
             llm_client: Optional LlamaClient instance. If None, creates a new one.
+            enable_film_layer: Enable Film Layer for cinematic grammar (default: True)
+            enable_camera_layer: Enable Camera Layer for technical specs (default: True)
         """
         self.llm = llm_client or LlamaClient()
-        logger.info("PromptGenerator initialized")
+        self.enable_film_layer = enable_film_layer
+        self.enable_camera_layer = enable_camera_layer
+
+        # Initialize multi-layer pipeline
+        self.film_layer = FilmLayer() if enable_film_layer else None
+        self.camera_layer = CameraLayer() if enable_camera_layer else None
+
+        logger.info(
+            f"PromptGenerator initialized (film_layer={enable_film_layer}, "
+            f"camera_layer={enable_camera_layer})"
+        )
 
     def generate(
         self,
         expanded_story: str,
-        temperature: float = 0.7
+        temperature: float = 0.7,
+        global_style: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """Generate Stable Diffusion prompts from a story.
+        """Generate Stable Diffusion prompts from a story using multi-layer pipeline.
 
-        This runs a multi-step pipeline to reduce load on smaller LLMs:
-        1) Summarize the story into plot beats
-        2) Convert beats into structured scenes with Stable Diffusion prompts
-        3) Validate and normalize the JSON result
+        Pipeline stages:
+        1) Story Layer: Summarize the story into plot beats
+        2) Story Layer: Convert beats into basic scene descriptions (LLM)
+        3) Film Layer: Analyze scene emotions and apply cinematic grammar
+        4) Camera Layer: Assign specific camera techniques
+        5) Prompt Layer: Build enhanced prompts with all layers integrated
 
         Args:
             expanded_story: The expanded story in English
             temperature: Sampling temperature (0.0-1.0)
+            global_style: Optional global visual style dict (from visual_styles.py)
 
         Returns:
-            Dictionary containing scenes with prompts
+            Dictionary containing scenes with enhanced prompts and metadata
         """
         logger.info(f"Generating prompts for story (length: {len(expanded_story)} chars)")
+        logger.info(f"Multi-layer pipeline: Film={self.enable_film_layer}, Camera={self.enable_camera_layer}")
 
-        # Step A: Summarize the story into plot beats
+        # ====================================================================
+        # Stage 1: Story Layer - Summarize into plot beats
+        # ====================================================================
         beats = self._summarize_story_to_beats(expanded_story)
         beats_text = "\n".join([f"{idx + 1}) {beat}" for idx, beat in enumerate(beats)])
 
+        # ====================================================================
+        # Stage 2: Story Layer - Generate basic scene descriptions
+        # ====================================================================
         user_prompt = f"""Here is the story broken into plot beats:
 
 {beats_text}
@@ -129,8 +165,48 @@ Follow the JSON schema strictly and provide English-only content."""
             )
 
             validated = self._validate_and_normalize_result(result)
-            num_scenes = len(validated.get('scenes', []))
-            logger.info(f"Generated {num_scenes} scene prompts")
+            scenes = validated.get('scenes', [])
+            num_scenes = len(scenes)
+            logger.info(f"Generated {num_scenes} base scenes from story beats")
+
+            # ====================================================================
+            # Stage 3: Film Layer - Apply cinematic grammar
+            # ====================================================================
+            if self.enable_film_layer and self.film_layer:
+                logger.info("Applying Film Layer (cinematic grammar analysis)...")
+                scenes = self.film_layer.batch_analyze_scenes(scenes)
+                logger.info(f"✓ Film layer applied to {len(scenes)} scenes")
+
+            # ====================================================================
+            # Stage 4: Camera Layer - Assign camera techniques
+            # ====================================================================
+            if self.enable_camera_layer and self.camera_layer:
+                logger.info("Applying Camera Layer (shot types, angles, lenses)...")
+                scenes = self.camera_layer.batch_assign_cameras(scenes)
+
+                # Log variety statistics
+                stats = self.camera_layer.get_camera_variety_stats()
+                logger.info(
+                    f"✓ Camera layer applied: {stats.get('unique_shot_types', 0)} unique shot types, "
+                    f"{stats.get('unique_angles', 0)} unique angles"
+                )
+
+            # ====================================================================
+            # Stage 5: Prompt Layer - Build enhanced prompts
+            # ====================================================================
+            logger.info("Building enhanced prompts with Film + Camera layers...")
+            for scene in scenes:
+                # Build enhanced prompt incorporating all layers
+                enhanced_prompt = self._build_enhanced_prompt(
+                    scene=scene,
+                    global_style=global_style
+                )
+                scene["prompt_en"] = enhanced_prompt
+
+            logger.info(f"✓ Enhanced prompts generated for {num_scenes} scenes")
+
+            # Update validated result
+            validated['scenes'] = scenes
 
             return validated
 
@@ -298,11 +374,92 @@ Start with { and end with }. Nothing before or after."""
             raise
 
 
+    def _build_enhanced_prompt(
+        self,
+        scene: Dict[str, Any],
+        global_style: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Build enhanced prompt incorporating Film + Camera layers.
+
+        Constructs a structured Stable Diffusion prompt in this format:
+        [Scene Description] + [Camera Specs] + [Film Style] + [Global Style] + [Quality Tags]
+
+        Args:
+            scene: Scene dictionary with description, film_style, camera_style
+            global_style: Optional global visual style settings
+
+        Returns:
+            Enhanced prompt string for Stable Diffusion
+        """
+        components = []
+
+        # 1. Base scene description (from LLM)
+        base_description = scene.get("description") or scene.get("summary", "")
+        if base_description:
+            components.append(base_description)
+
+        # 2. Camera specifications (if Camera Layer enabled)
+        if "camera_style" in scene:
+            camera = scene["camera_style"]
+            camera_spec = (
+                f"{camera.get('shot_type_name', '')}, "
+                f"{camera.get('angle_description', '')}, "
+                f"{camera.get('lens_description', '')}, "
+                f"{camera.get('movement_description', '')}"
+            )
+            components.append(camera_spec)
+
+        # 3. Film style (lighting, color, atmosphere)
+        if "film_style" in scene:
+            film = scene["film_style"]
+
+            # Lighting
+            if film.get("lighting"):
+                components.append(film["lighting"])
+
+            # Color grading
+            if film.get("color_grading"):
+                components.append(film["color_grading"])
+
+            # Composition style
+            if film.get("composition"):
+                components.append(film["composition"])
+
+            # Atmosphere
+            if film.get("atmosphere"):
+                components.append(f"{film['atmosphere']} atmosphere")
+
+        # 4. Global visual style (theme-wide consistency)
+        if global_style:
+            # Add global texture/quality if not already covered by film style
+            if global_style.get("texture"):
+                components.append(global_style["texture"])
+
+            # Add consistency tags for cross-scene coherence
+            if global_style.get("consistency_tags"):
+                components.append(global_style["consistency_tags"])
+
+            # Add quality tags
+            if global_style.get("quality_tags"):
+                components.append(global_style["quality_tags"])
+        else:
+            # Default quality tags if no global style
+            components.append(
+                "masterpiece, best quality, ultra detailed, 8k, "
+                "photorealistic, cinematic composition"
+            )
+
+        # Combine all components with proper formatting
+        enhanced_prompt = ", ".join(filter(None, components))
+
+        return enhanced_prompt
+
+
 def generate_prompts(expanded_story: str) -> Dict[str, Any]:
     """Convenience function to generate prompts.
 
     Args:
-        expanded_story: Expanded story in Korean
+        expanded_story: Expanded story in English
 
     Returns:
         Dictionary with scene prompts

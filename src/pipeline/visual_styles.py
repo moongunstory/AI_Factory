@@ -1,5 +1,12 @@
-"""Visual style definitions for different themes."""
-from typing import Dict, Any
+"""Visual style definitions for different themes.
+
+This module provides:
+1. Pre-defined visual styles for different themes (dark_fantasy, horror, etc.)
+2. Global style configuration for project-wide consistency
+3. Integration with the multi-layer prompt generation pipeline
+"""
+from typing import Dict, Any, Optional
+from dataclasses import dataclass, asdict
 
 
 class VisualStyleDefinitions:
@@ -169,3 +176,136 @@ class VisualStyleDefinitions:
 
         style = cls.STYLES[theme]
         return f"{style['name']} - {style['atmosphere']}"
+
+
+# ====================================================================
+# Global Style Configuration
+# ====================================================================
+
+@dataclass
+class GlobalStyleConfig:
+    """Global visual style configuration for an entire project.
+
+    This configuration is applied across all scenes to maintain visual consistency
+    while allowing per-scene variation through Film and Camera layers.
+
+    Attributes:
+        theme: Theme name (e.g., 'dark_fantasy', 'horror', 'anime')
+        color_tone: Optional custom color tone override
+        camera_base: Optional base camera style preference
+        film_texture: Optional film texture/grain level
+        enable_film_layer: Enable Film Layer for cinematic grammar
+        enable_camera_layer: Enable Camera Layer for technical variety
+    """
+    theme: str = "cinematic_realism"
+    color_tone: Optional[str] = None
+    camera_base: Optional[str] = None
+    film_texture: Optional[str] = None
+    enable_film_layer: bool = True
+    enable_camera_layer: bool = True
+
+    def __post_init__(self):
+        """Validate theme selection."""
+        if self.theme not in VisualStyleDefinitions.STYLES:
+            available = VisualStyleDefinitions.list_themes()
+            raise ValueError(
+                f"Invalid theme '{self.theme}'. "
+                f"Available themes: {', '.join(available)}"
+            )
+
+    def get_theme_style(self) -> Dict[str, Any]:
+        """Get the complete theme style dictionary.
+
+        Returns:
+            Theme style dict from VisualStyleDefinitions
+        """
+        return VisualStyleDefinitions.get_style(self.theme)
+
+    def get_global_style_dict(self) -> Dict[str, Any]:
+        """Get global style as dictionary for prompt generation.
+
+        Merges theme style with any custom overrides.
+
+        Returns:
+            Dictionary with all global style parameters
+        """
+        theme_style = self.get_theme_style()
+
+        # Apply custom overrides if specified
+        if self.color_tone:
+            theme_style["color_palette"] = self.color_tone
+
+        if self.camera_base:
+            theme_style["camera"] = self.camera_base
+
+        if self.film_texture:
+            theme_style["texture"] = self.film_texture
+
+        return theme_style
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary.
+
+        Returns:
+            Configuration as dictionary
+        """
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, config_dict: Dict[str, Any]) -> "GlobalStyleConfig":
+        """Create from dictionary.
+
+        Args:
+            config_dict: Configuration dictionary
+
+        Returns:
+            GlobalStyleConfig instance
+        """
+        return cls(**config_dict)
+
+    @classmethod
+    def from_theme(cls, theme: str) -> "GlobalStyleConfig":
+        """Create global config from theme name only.
+
+        Convenience method for quick theme-based configuration.
+
+        Args:
+            theme: Theme name (e.g., 'horror', 'anime')
+
+        Returns:
+            GlobalStyleConfig with default settings for theme
+        """
+        return cls(theme=theme)
+
+
+# ====================================================================
+# Convenience Functions
+# ====================================================================
+
+def create_global_config(
+    theme: str = "cinematic_realism",
+    **overrides
+) -> GlobalStyleConfig:
+    """Create a global style configuration.
+
+    Args:
+        theme: Theme name
+        **overrides: Optional custom overrides (color_tone, camera_base, etc.)
+
+    Returns:
+        GlobalStyleConfig instance
+    """
+    return GlobalStyleConfig(theme=theme, **overrides)
+
+
+def get_available_themes() -> Dict[str, str]:
+    """Get all available themes with descriptions.
+
+    Returns:
+        Dictionary mapping theme keys to readable descriptions
+    """
+    themes = {}
+    for theme_key in VisualStyleDefinitions.list_themes():
+        style = VisualStyleDefinitions.STYLES[theme_key]
+        themes[theme_key] = f"{style['name']} - {style['atmosphere']}"
+    return themes
