@@ -1,5 +1,4 @@
 from __future__ import annotations
-import json
 import uuid
 import time
 from pathlib import Path
@@ -14,9 +13,9 @@ logger = setup_logger(__name__)
 
 
 class ComfyUIVideoClient:
-    """SVD (Stable Video Diffusion) video generator."""
+    """Stable Video Diffusion (SVD) video generator via ComfyUI."""
 
-    # Camera prompt to motion_bucket_id mapping
+    # 카메라 프롬프트 → motion_bucket_id 매핑 (원할 때 나중에 튜닝)
     CAMERA_TO_MOTION = {
         "static": 50,
         "forward": 127,
@@ -40,19 +39,23 @@ class ComfyUIVideoClient:
         camera_prompt: str = "cinematic",
         fps: int = 24,
     ) -> Dict[str, Any]:
+        """
+        하나의 이미지에서 SVD로 짧은 mp4 클립 생성.
+        duration_sec, fps → 프레임 수로 변환해서 SVD에 넘김.
+        """
 
         if not image_path.exists():
             raise FileNotFoundError(f"Input image not found: {image_path}")
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Calculate frames from duration and fps
-        num_frames = int(duration_sec * fps)
+        # 최소 프레임 수는 너무 짧지 않도록 8 프레임 이상으로 보정
+        num_frames = max(8, int(duration_sec * fps))
 
-        # Map camera_prompt to motion_bucket_id
         motion_bucket_id = self.CAMERA_TO_MOTION.get(camera_prompt, 127)
 
-        prompt = self.build_svd_prompt(
+        # ComfyUI용 prompt 그래프 생성
+        prompt_graph = self.build_svd_prompt(
             image_path=image_path,
             output_path=output_path,
             num_frames=num_frames,
@@ -60,8 +63,12 @@ class ComfyUIVideoClient:
             motion_bucket_id=motion_bucket_id,
         )
 
-        prompt_id = self._queue_prompt(prompt)
-        logger.info(f"Queued SVD prompt: {prompt_id} (frames={num_frames}, fps={fps}, motion={motion_bucket_id})")
+        # ComfyUI API는 {"prompt": {...}, "client_id": "..."} 형식을 기대함
+        prompt_id = self._queue_prompt(prompt_graph)
+        logger.info(
+            f"[ComfyUI] Queued SVD prompt: {prompt_id} "
+            f"(frames={num_frames}, fps={fps}, motion={motion_bucket_id})"
+        )
 
         if not self._wait_for_completion(prompt_id, timeout=self.timeout):
             raise RuntimeError(f"Video generation timed out after {self.timeout}s")
@@ -79,117 +86,145 @@ class ComfyUIVideoClient:
         fps: int,
         motion_bucket_id: int,
     ) -> Dict[str, Any]:
-        """Build SVD workflow prompt."""
+        """
+        Stable Video Diffusion 기본 워크플로우
+        """
+        
+        # 이미지를 ComfyUI input 폴더로 복사
+        import shutil
+        comfyui_input = Path("C:/Users/moong/Desktop/Project/AI_shorts_factory/engine/comfyui/input")
+        comfyui_input.mkdir(exist_ok=True)
+        
+        target_image = comfyui_input / image_path.name
+        shutil.copy2(image_path, target_image)
+        
+        image_name = image_path.name
+        out_prefix = output_path.with_suffix("").name
 
-        # SVD workflow nodes
         return {
-            "prompt": {
-                "1": {
-                    "class_type": "LoadImage",
-                    "inputs": {
-                        "image": str(image_path.name),
-                        "upload": "image",
-                    },
+            "1": {
+                "class_type": "LoadImage",
+                "inputs": {
+                    "image": image_name,
                 },
-                "2": {
-                    "class_type": "SVD_img2vid_Conditioning",
-                    "inputs": {
-                        "width": 1024,
-                        "height": 576,
-                        "video_frames": num_frames,
-                        "motion_bucket_id": motion_bucket_id,
-                        "fps": fps,
-                        "augmentation_level": 0.0,
-                        "clip_vision": ["3", 0],
-                        "init_image": ["1", 0],
-                        "vae": ["4", 0],
-                    },
+            },
+            "2": {
+                "class_type": "SVD_img2vid_Conditioning",
+                "inputs": {
+                    "width": 1024,
+                    "height": 576,
+                    "video_frames": num_frames,
+                    "motion_bucket_id": motion_bucket_id,
+                    "fps": fps,
+                    "augmentation_level": 0.0,
+                    "clip_vision": ["3", 0],
+                    "init_image": ["1", 0],
+                    "vae": ["4", 0],
                 },
-                "3": {
-                    "class_type": "CLIPVisionLoader",
-                    "inputs": {
-                        "clip_name": "SD15/model.safetensors",
-                    },
+            },
+            "3": {
+                "class_type": "CLIPVisionLoader",
+                "inputs": {
+                    "clip_name": "model.safetensors",
                 },
-                "4": {
-                    "class_type": "VAELoader",
-                    "inputs": {
-                        "vae_name": "vae-ft-mse-840000-ema-pruned.safetensors",
-                    },
+            },
+            "4": {
+                "class_type": "VAELoader",
+                "inputs": {
+                    "vae_name": "wan2.2_vae.safetensors",
                 },
-                "5": {
-                    "class_type": "VideoLinearCFGGuidance",
-                    "inputs": {
-                        "min_cfg": 1.0,
-                        "conditioning": ["2", 0],
-                    },
+            },
+            "5": {
+                "class_type": "ImageOnlyCheckpointLoader",
+                "inputs": {
+                    "ckpt_name": "svd.safetensors",
                 },
-                "6": {
-                    "class_type": "KSamplerSelect",
-                    "inputs": {
-                        "sampler_name": "euler",
-                    },
+            },
+            "6": {
+                "class_type": "KSampler",
+                "inputs": {
+                    "seed": 42,
+                    "steps": 20,
+                    "cfg": 2.5,
+                    "sampler_name": "euler",
+                    "scheduler": "karras",
+                    "denoise": 1.0,
+                    "model": ["5", 0],          # ✅ Node 5 (ImageOnlyCheckpointLoader)
+                    "positive": ["2", 0],       # ✅ Node 2의 positive 출력
+                    "negative": ["2", 1],       # ✅ Node 2의 negative 출력
+                    "latent_image": ["2", 2],   # ✅ Node 2의 latent 출력
                 },
-                "7": {
-                    "class_type": "KSampler",
-                    "inputs": {
-                        "seed": 42,
-                        "steps": 20,
-                        "cfg": 2.5,
-                        "sampler_name": "euler",
-                        "scheduler": "karras",
-                        "denoise": 1.0,
-                        "model": ["8", 0],
-                        "positive": ["5", 0],
-                        "negative": ["2", 1],
-                        "latent_image": ["2", 2],
-                    },
+            },
+            "7": {
+                "class_type": "VAEDecode",
+                "inputs": {
+                    "samples": ["6", 0],        # ✅ Node 6 (KSampler) 출력
+                    "vae": ["4", 0],
                 },
-                "8": {
-                    "class_type": "ImageOnlyCheckpointLoader",
-                    "inputs": {
-                        "ckpt_name": "svd_xt.safetensors",
-                    },
+            },
+            "8": {
+                "class_type": "VHS_VideoCombine",
+                "inputs": {
+                    "frame_rate": fps,
+                    "loop_count": 0,
+                    "filename_prefix": out_prefix,
+                    "format": "video/h264-mp4",
+                    "pingpong": False,
+                    "save_output": True,
+                    "images": ["7", 0],         # ✅ Node 7 (VAEDecode) 출력
                 },
-                "9": {
-                    "class_type": "VAEDecode",
-                    "inputs": {
-                        "samples": ["7", 0],
-                        "vae": ["4", 0],
-                    },
-                },
-                "10": {
-                    "class_type": "VHS_VideoCombine",
-                    "inputs": {
-                        "frame_rate": fps,
-                        "format": "video/h264-mp4",
-                        "filename_prefix": str(output_path.with_suffix("").name),
-                        "images": ["9", 0],
-                    },
-                },
-            }
+            },
         }
 
-    def _queue_prompt(self, prompt: Dict[str, Any]) -> str:
-        prompt_id = str(uuid.uuid4())
-        payload = {"prompt": prompt, "client_id": prompt_id}
-        res = requests.post(f"{self.server_url}/prompt", json=payload, timeout=20)
-        res.raise_for_status()
+    def _queue_prompt(self, prompt_graph: Dict[str, Any]) -> str:
+        """
+        ComfyUI /prompt 호출.
+        prompt_graph: 위 build_svd_prompt가 반환한 '노드ID → 노드 정의' dict.
+        """
+        client_id = str(uuid.uuid4())
+        payload = {
+            "prompt": prompt_graph,
+            "client_id": client_id,
+        }
+
+        res = requests.post(
+            f"{self.server_url}/prompt",
+            json=payload,
+            timeout=20,
+        )
+
+        # 여기서 400/500 같은 HTTP 에러가 나면 그대로 raise 해서 위에서 잡음
+        try:
+            res.raise_for_status()
+        except Exception:
+            logger.error(
+                "ComfyUI /prompt HTTP error: %s\nBody: %s",
+                res.status_code,
+                res.text,
+            )
+            raise
+
         result = res.json()
-        return result.get("prompt_id", prompt_id)
+        # ComfyUI가 돌려주는 prompt_id 사용 (없으면 client_id 그대로)
+        return result.get("prompt_id", client_id)
 
     def _wait_for_completion(self, prompt_id: str, timeout: int) -> bool:
+        """
+        /history/{prompt_id} 폴링해서 완료 여부 확인.
+        """
         start = time.time()
         while time.time() - start < timeout:
             try:
                 res = requests.get(
-                    f"{self.server_url}/history/{prompt_id}", timeout=8
+                    f"{self.server_url}/history/{prompt_id}",
+                    timeout=8,
                 )
                 if res.status_code == 200:
                     hist = res.json().get(prompt_id, {})
                     if hist.get("status", {}).get("completed"):
                         return True
             except Exception:
+                # 네트워크 잠깐 끊겨도 다시 시도
                 pass
             time.sleep(2)
         return False

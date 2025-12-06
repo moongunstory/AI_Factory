@@ -49,6 +49,8 @@ Config.ensure_output_dirs()
 
 # Initialize AI components (singleton)
 components = None
+mode = None
+project_id = None
 
 
 class ProjectStorage:
