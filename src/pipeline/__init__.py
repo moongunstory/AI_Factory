@@ -15,6 +15,7 @@ Main components:
 """
 
 from .story_expander import StoryExpander, expand_story
+from .character_extractor import CharacterExtractor, extract_characters
 from .prompt_generator import PromptGenerator, generate_prompts
 from .film_layer import FilmLayer, SceneEmotion
 from .camera_layer import CameraLayer
@@ -29,6 +30,9 @@ __all__ = [
     # Story expansion
     "StoryExpander",
     "expand_story",
+    # Character extraction
+    "CharacterExtractor",
+    "extract_characters",
     # Prompt generation
     "PromptGenerator",
     "generate_prompts",
