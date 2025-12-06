@@ -87,21 +87,36 @@ class ComfyUIVideoClient:
         motion_bucket_id: int,
     ) -> Dict[str, Any]:
         """
-        Stable Video Diffusion 기본 워크플로우
+        Stable Video Diffusion 워크플로우
+        VIDEO_USE_UPSCALE=true이면 저해상도 생성 후 업스케일
         """
-        
+
         # 이미지를 ComfyUI input 폴더로 복사
         import shutil
         comfyui_input = Path("C:/Users/moong/Desktop/Project/AI_shorts_factory/engine/comfyui/input")
         comfyui_input.mkdir(exist_ok=True)
-        
+
         target_image = comfyui_input / image_path.name
         shutil.copy2(image_path, target_image)
-        
+
         image_name = image_path.name
         out_prefix = output_path.with_suffix("").name
 
-        return {
+        # 해상도 설정: 업스케일 사용 시 저해상도로 시작
+        if Config.VIDEO_USE_UPSCALE:
+            base_width = Config.VIDEO_BASE_WIDTH
+            base_height = Config.VIDEO_BASE_HEIGHT
+            target_width = Config.VIDEO_TARGET_WIDTH
+            target_height = Config.VIDEO_TARGET_HEIGHT
+            use_upscale = True
+            logger.info(f"Using low-res + upscale strategy: {base_width}x{base_height} → {target_width}x{target_height}")
+        else:
+            base_width = Config.VIDEO_TARGET_WIDTH
+            base_height = Config.VIDEO_TARGET_HEIGHT
+            use_upscale = False
+            logger.info(f"Using direct generation: {base_width}x{base_height}")
+
+        workflow = {
             "1": {
                 "class_type": "LoadImage",
                 "inputs": {
@@ -111,8 +126,8 @@ class ComfyUIVideoClient:
             "2": {
                 "class_type": "SVD_img2vid_Conditioning",
                 "inputs": {
-                    "width": 1024,
-                    "height": 576,
+                    "width": base_width,
+                    "height": base_height,
                     "video_frames": num_frames,
                     "motion_bucket_id": motion_bucket_id,
                     "fps": fps,
@@ -149,32 +164,72 @@ class ComfyUIVideoClient:
                     "sampler_name": "euler",
                     "scheduler": "karras",
                     "denoise": 1.0,
-                    "model": ["5", 0],          # ✅ Node 5 (ImageOnlyCheckpointLoader)
-                    "positive": ["2", 0],       # ✅ Node 2의 positive 출력
-                    "negative": ["2", 1],       # ✅ Node 2의 negative 출력
-                    "latent_image": ["2", 2],   # ✅ Node 2의 latent 출력
-                },
-            },
-            "7": {
-                "class_type": "VAEDecode",
-                "inputs": {
-                    "samples": ["6", 0],        # ✅ Node 6 (KSampler) 출력
-                    "vae": ["4", 0],
-                },
-            },
-            "8": {
-                "class_type": "VHS_VideoCombine",
-                "inputs": {
-                    "frame_rate": fps,
-                    "loop_count": 0,
-                    "filename_prefix": out_prefix,
-                    "format": "video/h264-mp4",
-                    "pingpong": False,
-                    "save_output": True,
-                    "images": ["7", 0],         # ✅ Node 7 (VAEDecode) 출력
+                    "model": ["5", 0],
+                    "positive": ["2", 0],
+                    "negative": ["2", 1],
+                    "latent_image": ["2", 2],
                 },
             },
         }
+
+        if use_upscale:
+            # 저해상도 + 업스케일 워크플로우
+            upscale_factor = target_width / base_width
+
+            workflow.update({
+                "7": {
+                    "class_type": "LatentUpscaleBy",
+                    "inputs": {
+                        "samples": ["6", 0],
+                        "scale_by": upscale_factor,
+                        "upscale_method": "bicubic",  # bicubic, nearest, bilinear, bislerp
+                    },
+                },
+                "8": {
+                    "class_type": "VAEDecode",
+                    "inputs": {
+                        "samples": ["7", 0],
+                        "vae": ["4", 0],
+                    },
+                },
+                "9": {
+                    "class_type": "VHS_VideoCombine",
+                    "inputs": {
+                        "frame_rate": fps,
+                        "loop_count": 0,
+                        "filename_prefix": out_prefix,
+                        "format": "video/h264-mp4",
+                        "pingpong": False,
+                        "save_output": True,
+                        "images": ["8", 0],
+                    },
+                },
+            })
+        else:
+            # 기본 워크플로우 (업스케일 없음)
+            workflow.update({
+                "7": {
+                    "class_type": "VAEDecode",
+                    "inputs": {
+                        "samples": ["6", 0],
+                        "vae": ["4", 0],
+                    },
+                },
+                "8": {
+                    "class_type": "VHS_VideoCombine",
+                    "inputs": {
+                        "frame_rate": fps,
+                        "loop_count": 0,
+                        "filename_prefix": out_prefix,
+                        "format": "video/h264-mp4",
+                        "pingpong": False,
+                        "save_output": True,
+                        "images": ["7", 0],
+                    },
+                },
+            })
+
+        return workflow
 
     def _queue_prompt(self, prompt_graph: Dict[str, Any]) -> str:
         """
@@ -211,9 +266,14 @@ class ComfyUIVideoClient:
     def _wait_for_completion(self, prompt_id: str, timeout: int) -> bool:
         """
         /history/{prompt_id} 폴링해서 완료 여부 확인.
+        timeout=0이면 무제한 대기.
         """
         start = time.time()
-        while time.time() - start < timeout:
+        while True:
+            # timeout이 0이 아니면 체크
+            if timeout > 0 and (time.time() - start >= timeout):
+                return False
+
             try:
                 res = requests.get(
                     f"{self.server_url}/history/{prompt_id}",
@@ -227,7 +287,6 @@ class ComfyUIVideoClient:
                 # 네트워크 잠깐 끊겨도 다시 시도
                 pass
             time.sleep(2)
-        return False
 
     def is_healthy(self) -> bool:
         try:
