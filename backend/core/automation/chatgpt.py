@@ -85,7 +85,8 @@ class ChatGPTClient:
     @staticmethod
     def _copy_button_selector() -> str:
         """Return a CSS selector for the copy button (appears when response is done)."""
-        return 'button[aria-label="Copy"]'
+        # Supports English, Korean, and stable data-testid if available
+        return 'button[aria-label="Copy"], button[aria-label="복사"], button[aria-label="복사하기"], button[data-testid="copy-turn-action-button"]'
 
     # ---------------------------------------------------------------------
     # Navigation & Login helpers

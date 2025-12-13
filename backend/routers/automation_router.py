@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from backend.core.automation.chatgpt import ChatGPTClient
+from backend.core.debug_logger import save_error_log
 
 router = APIRouter()
 
@@ -34,8 +35,13 @@ async def expand_story(request: StoryRequest):
         )
 
         return {"expanded_story": expanded_story}
-
+            
     except Exception as e:
+        await save_error_log(
+            e, 
+            context={"request": request.dict(), "endpoint": "expand_story"},
+            page=chatgpt_client.page
+        )
         print(f"Automation Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -61,5 +67,10 @@ async def generate_video_workflow(request: StoryRequest):
         )
 
     except Exception as e:
+        await save_error_log(
+            e, 
+            context={"request": request.dict(), "endpoint": "generate_video_workflow"},
+            page=chatgpt_client.page
+        )
         print(f"Workflow Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
