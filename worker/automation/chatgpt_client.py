@@ -37,7 +37,7 @@ class ChatGPTClient:
         if self.page and not self.page.is_closed():
             return
 
-        print("[Worker] 브라우저 시작 중...")
+        print("[Worker] 브라우저 시작 중... (화면 표시 모드)")
 
         self.playwright = sync_playwright().start()
 

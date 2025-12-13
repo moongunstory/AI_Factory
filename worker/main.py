@@ -19,7 +19,7 @@ def main():
 
     processor = VideoWorkflowProcessor()
 
-    queue_dir = Path("queue")
+    queue_dir = Path(".data/queue")
     pending_dir = queue_dir / "pending"
     processing_dir = queue_dir / "processing"
 
