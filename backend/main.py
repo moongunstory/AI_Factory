@@ -1,16 +1,8 @@
 # backend/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pathlib import Path
-import sys
-import asyncio
 
-# Fix for "NotImplementedError" in asyncio/proactor with Playwright on Windows
-# Uvicorn or other libs might default to SelectorEventLoop in some envs, which doesn't support subprocesses needed by Playwright.
-if sys.platform.startswith("win"):
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
-app = FastAPI(title="AI Shorts Factory Backend", version="0.1.0")
+app = FastAPI(title="AI Shorts Factory - Job Queue Mode", version="1.0.0")
 
 # CORS setup for Frontend
 origins = [
@@ -27,18 +19,19 @@ app.add_middleware(
 )
 
 @app.get("/")
-async def root():
-    return {"message": "AI Shorts Factory Engine Online"}
+def root():
+    return {
+        "message": "AI Shorts Factory - Job Queue Mode",
+        "info": "브라우저 자동화는 별도 워커 프로세스에서 실행됩니다."
+    }
 
 @app.get("/health")
-async def health_check():
+def health_check():
     return {"status": "ok"}
 
-from backend.routers import automation_router
-app.include_router(automation_router.router, prefix="/api/automation", tags=["automation"])
-# from backend.api.v1.endpoints import generation
-# app.include_router(generation.router, prefix="/api/v1")
+from backend.routers import job_router
+app.include_router(job_router.router, prefix="/api", tags=["jobs"])
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True, loop="asyncio")
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
