@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import asyncio
 from pathlib import Path
@@ -36,6 +37,13 @@ class ChatGPTClient:
         """
         if self.page and not self.page.is_closed():
             return
+
+        # Windows에서 Playwright 서브프로세스 실행을 위한 이벤트 루프 정책 설정
+        if sys.platform.startswith("win"):
+            # 현재 이벤트 루프 정책이 ProactorEventLoop가 아니면 설정
+            if not isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsProactorEventLoopPolicy):
+                asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+                print("[ChatGPTClient] Windows ProactorEventLoopPolicy 설정됨")
 
         self.playwright = await async_playwright().start()
 
