@@ -27,7 +27,7 @@ async def root():
 async def health_check():
     return {"status": "ok"}
 
-from routers import automation_router
+from backend.routers import automation_router
 app.include_router(automation_router.router, prefix="/api/automation", tags=["automation"])
 # from backend.api.v1.endpoints import generation
 # app.include_router(generation.router, prefix="/api/v1")
