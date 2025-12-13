@@ -2,6 +2,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
+import sys
+import asyncio
+
+# Fix for "NotImplementedError" in asyncio/proactor with Playwright on Windows
+# Uvicorn or other libs might default to SelectorEventLoop in some envs, which doesn't support subprocesses needed by Playwright.
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 app = FastAPI(title="AI Shorts Factory Backend", version="0.1.0")
 
