@@ -238,6 +238,11 @@ ${worldviewInput}
     }, 2000);
   };
 
+  // Job 상태 타입 정의
+  type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+  const [pollingStatus, setPollingStatus] = useState<string>("");
+
   const handleGenerate = async () => {
     if (!story.trim()) {
       alert("스토리를 먼저 입력해주세요!");
@@ -247,10 +252,11 @@ ${worldviewInput}
     setIsGenerating(true);
     setWorkflowError(null);
     setWorkflowResults(null);
+    setPollingStatus("작업 요청 중...");
 
     try {
-      // API 호출 - 3단계 GPT 워크플로우 실행
-      const response = await fetch("http://localhost:8000/api/automation/generate-video-workflow", {
+      // 1. 작업 생성 요청 (POST /api/jobs)
+      const response = await fetch("http://localhost:8000/api/jobs", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -260,19 +266,53 @@ ${worldviewInput}
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "워크플로우 실행 중 오류가 발생했습니다.");
+        throw new Error(errorData.detail || "작업 생성 중 오류가 발생했습니다.");
       }
 
-      const data = await response.json();
-      setWorkflowResults(data);
-      alert("✅ GPT 워크플로우가 성공적으로 완료되었습니다!");
+      const { job_id } = await response.json();
+      setPollingStatus("작업 대기 중...");
+
+      // 2. 폴링 시작
+      const pollJobStatus = async () => {
+        try {
+          const statusResponse = await fetch(`http://localhost:8000/api/jobs/${job_id}`);
+          if (!statusResponse.ok) {
+            throw new Error("작업 상태 확인 실패");
+          }
+
+          const jobData = await statusResponse.json();
+          const { status, result, message } = jobData;
+
+          if (status === 'completed') {
+            setWorkflowResults(result);
+            setPollingStatus("");
+            setIsGenerating(false);
+            alert("✅ GPT 워크플로우가 성공적으로 완료되었습니다!");
+          } else if (status === 'failed') {
+            throw new Error(message || "작업 처리 중 오류가 발생했습니다.");
+          } else {
+            // 계속 폴링 (pending or processing)
+            setPollingStatus(status === 'processing' ? "작업 처리 중..." : "작업 대기 중...");
+            setTimeout(pollJobStatus, 2000); // 2초 후 재시도
+          }
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
+          setWorkflowError(errorMessage);
+          setPollingStatus("");
+          setIsGenerating(false);
+          alert(`❌ 오류: ${errorMessage}`);
+        }
+      };
+
+      // 폴링 시작
+      pollJobStatus();
 
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
       setWorkflowError(errorMessage);
-      alert(`❌ 오류: ${errorMessage}\n\n브라우저에서 ChatGPT에 로그인되어 있는지 확인해주세요.`);
-    } finally {
+      setPollingStatus("");
       setIsGenerating(false);
+      alert(`❌ 오류: ${errorMessage}\n\n백엔드 서버가 실행 중인지 확인해주세요.`);
     }
   };
 
@@ -914,7 +954,7 @@ ${worldviewInput}
                         gradient={mode === "short" ? { from: "violet", to: "cyan" } : { from: "grape", to: "violet" }}
                         fullWidth
                       >
-                        {mode === "short" ? "단편 영상 생성" : "시리즈 생성"}
+                        {isGenerating && pollingStatus ? pollingStatus : (mode === "short" ? "단편 영상 생성" : "시리즈 생성")}
                       </Button>
                     </Stack>
                   </Tabs.Panel>
