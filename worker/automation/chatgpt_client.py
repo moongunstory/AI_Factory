@@ -16,16 +16,16 @@ class ChatGPTClient:
     }
 
     def __init__(self, user_data_dir: str = None, storage_state_path: str = None):
-        # 기본 경로를 프로젝트 루트의 .chrome_profile로 설정
+        # 기본 경로를 프로젝트 루트의 .data/browser/chrome로 설정
         if user_data_dir is None:
             project_root = Path(__file__).parent.parent.parent
-            user_data_dir = str(project_root / ".chrome_profile")
+            user_data_dir = str(project_root / ".data" / "browser" / "chrome")
         self.user_data_dir = os.path.abspath(user_data_dir)
 
         # Storage state 경로 (세션 persistence를 위한)
         if storage_state_path is None:
             project_root = Path(__file__).parent.parent.parent
-            storage_state_path = str(project_root / ".chatgpt_storage_state.json")
+            storage_state_path = str(project_root / ".data" / "sessions" / "chatgpt.json")
         self.storage_state_path = Path(storage_state_path)
 
         self.playwright = None

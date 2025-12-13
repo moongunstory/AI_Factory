@@ -50,14 +50,17 @@ playwright install chromium
 
 ### 2. 실행
 
-#### Windows
+#### Windows (권장 방식)
 ```bash
-# 서버 + 워커 동시 시작 (권장)
-start_all.bat
+# 통합 실행 스크립트 - 메뉴에서 선택
+start.bat
 
-# 또는 개별 실행
-start_server.bat  # 서버만
-start_worker.bat  # 워커만
+# 메뉴 옵션:
+# 1. 전체 실행 (프론트엔드 + 백엔드 + 워커) - 일반 사용자용
+# 2. 개발 모드 (백엔드 + 워커만) - API 개발용
+# 3. 백엔드 서버만
+# 4. 워커만
+# 5. 프론트엔드 앱만
 ```
 
 #### Linux/Mac
@@ -146,6 +149,23 @@ GET http://localhost:8000/api/stats
 
 ```
 AI_Factory/
+├── .data/                      # 런타임 데이터 (Git 제외)
+│   ├── queue/                 # 작업 큐
+│   │   ├── pending/          # 대기 중
+│   │   ├── processing/       # 처리 중
+│   │   ├── completed/        # 완료
+│   │   └── failed/           # 실패
+│   ├── results/              # 결과 저장소
+│   │   └── {job_id}/
+│   │       ├── result.json
+│   │       ├── expanded_story.txt
+│   │       ├── storyboard.txt
+│   │       └── prompts.txt
+│   ├── sessions/             # 브라우저 세션
+│   │   └── chatgpt.json     # ChatGPT 로그인 상태
+│   └── browser/              # 브라우저 프로필
+│       └── chrome/           # Playwright Chrome 데이터
+│
 ├── backend/                    # FastAPI 서버 (Playwright 없음!)
 │   ├── main.py                # asyncio 정책 제거됨
 │   ├── routers/
@@ -153,33 +173,27 @@ AI_Factory/
 │   └── core/
 │       ├── domain/
 │       │   └── models.py     # VideoJob, Scene 등
-│       └── queue/            # 새로 추가됨
-│           ├── job_queue.py  # 파일 기반 큐 관리
+│       └── queue/            # 파일 기반 큐
+│           ├── job_queue.py  # 큐 관리 (.data/queue 사용)
 │           └── models.py     # 큐 관련 모델
 │
-├── worker/                     # 워커 프로세스 (새로 추가됨)
+├── worker/                     # 워커 프로세스
 │   ├── main.py                # 메인 루프 (동기)
 │   ├── processor.py           # 작업 처리 로직
 │   ├── automation/
 │   │   └── chatgpt_client.py # 동기 Playwright
 │   └── requirements.txt       # playwright 포함
 │
-├── queue/                      # 작업 큐 디렉토리
-│   ├── pending/               # 대기 중
-│   ├── processing/            # 처리 중
-│   ├── completed/             # 완료
-│   └── failed/                # 실패
+├── frontend/                   # Next.js 프론트엔드
+│   ├── app/                   # App Router
+│   └── package.json
 │
-├── results/                    # 결과 저장소
-│   └── {job_id}/
-│       ├── result.json
-│       ├── expanded_story.txt
-│       ├── storyboard.txt
-│       └── prompts.txt
-│
-├── start_server.bat           # 서버 시작
-├── start_worker.bat           # 워커 시작
-└── start_all.bat              # 서버 + 워커 동시 시작
+└── start.bat                   # 통합 실행 스크립트 (메뉴 선택)
+
+정리된 파일:
+✅ .data/ 폴더로 모든 런타임 데이터 통합
+✅ start.bat 하나로 모든 실행 옵션 통합
+✅ .gitignore에 .data/ 자동 제외
 
 삭제된 파일:
 ❌ chatgpt_automation.py                    # 레거시 동기 버전
@@ -187,6 +201,7 @@ AI_Factory/
 ❌ backend/core/logic/director.py           # 미사용 placeholder
 ❌ backend/core/debug_logger.py             # 미사용
 ❌ backend/routers/automation_router.py     # job_router로 대체
+❌ start_server.bat, start_worker.bat, start_all.bat, start_app.bat → start.bat으로 통합
 ```
 
 ---
@@ -291,8 +306,8 @@ completed/로 이동
 
 ### Q: 워커가 작업을 처리하지 않아요
 **A:**
-1. `queue/pending/` 디렉토리에 작업 파일이 있는지 확인
-2. 워커 프로세스가 실행 중인지 확인 (`start_worker.bat`)
+1. `.data/queue/pending/` 디렉토리에 작업 파일이 있는지 확인
+2. 워커 프로세스가 실행 중인지 확인 (`start.bat` → 옵션 4)
 3. 워커 콘솔에서 에러 메시지 확인
 
 ### Q: 브라우저가 열리지 않아요
@@ -303,7 +318,7 @@ completed/로 이동
 
 ### Q: 로그인이 계속 필요해요
 **A:**
-1. `.chatgpt_storage_state.json` 파일이 생성되었는지 확인
+1. `.data/sessions/chatgpt.json` 파일이 생성되었는지 확인
 2. 처음 실행 시 브라우저에서 ChatGPT 로그인 진행
 3. 로그인 후 세션이 자동으로 저장됨
 
