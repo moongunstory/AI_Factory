@@ -11,7 +11,11 @@ class ChatGPTClient:
         "storyboard_maker": "https://chatgpt.com/g/g-jtTGRSqZ9-storyboard-maker"
     }
 
-    def __init__(self, user_data_dir: str = "chrome_profile"):
+    def __init__(self, user_data_dir: str = None):
+        # 기본 경로를 프로젝트 루트의 .chrome_profile로 설정
+        if user_data_dir is None:
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            user_data_dir = os.path.join(project_root, ".chrome_profile")
         self.user_data_dir = os.path.abspath(user_data_dir)
         self.browser_context: BrowserContext = None
         self.page: Page = None
@@ -64,13 +68,30 @@ class ChatGPTClient:
         await self.ensure_on_target_page(gpt_url)
 
         # Check if we are logged in by looking for the textarea
+        textarea_selector = "#prompt-textarea"
+        login_required = False
+
         try:
-            # Common selector for the prompting area
-            textarea_selector = "#prompt-textarea"
+            # 먼저 짧게 확인 (5초)
             await self.page.wait_for_selector(textarea_selector, timeout=5000)
         except:
-            # If textarea not found, we might be at login screen
-            raise Exception("Input area not found. Please log in to ChatGPT in the opened browser window.")
+            # textarea가 없으면 로그인이 필요할 수 있음
+            login_required = True
+            print("\n" + "="*60)
+            print("ChatGPT 로그인이 필요합니다.")
+            print("열린 브라우저 창에서 로그인을 완료해주세요.")
+            print("로그인 후 자동으로 진행됩니다. (최대 5분 대기)")
+            print("="*60 + "\n")
+
+            # 사용자가 로그인할 수 있도록 충분한 시간 제공 (5분)
+            try:
+                await self.page.wait_for_selector(textarea_selector, timeout=300000)  # 5분
+                print("\n✓ 로그인이 확인되었습니다. 작업을 계속합니다.\n")
+            except:
+                raise Exception(
+                    "로그인 시간이 초과되었습니다. "
+                    "브라우저 창에서 ChatGPT에 로그인한 후 다시 시도해주세요."
+                )
 
         # Type the message
         # Using sequential typing to look more human
