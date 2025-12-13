@@ -11,7 +11,7 @@ from .models import VideoJob, JobStatus, JobResult
 class JobQueue:
     """파일 시스템 기반 작업 큐"""
 
-    def __init__(self, queue_dir: str = "queue", results_dir: str = "results"):
+    def __init__(self, queue_dir: str = ".data/queue", results_dir: str = ".data/results"):
         self.queue_dir = Path(queue_dir)
         self.results_dir = Path(results_dir)
 

@@ -59,6 +59,10 @@ Thumbs.db
 # Generated Output
 output/
 
-# Browser Profile Data
+# Runtime Data (queue, results, sessions, browser profiles)
+.data/
+
+# Legacy Browser Profile Data
 .chrome_profile/
 chrome_profile/
+.chatgpt_storage_state.json
