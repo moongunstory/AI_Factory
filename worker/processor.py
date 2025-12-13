@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Dict
 
 from worker.automation.chatgpt_client import ChatGPTClient
+from backend.core.debug_logger import save_error_log
 
 
 class VideoWorkflowProcessor:
@@ -52,6 +53,16 @@ class VideoWorkflowProcessor:
         except Exception as e:
             print(f"❌ 작업 실패: {job_id}")
             print(f"   에러: {e}\n")
+
+            # Save detailed error log to debug directory
+            context = {
+                "job_id": job_id,
+                "story": story,
+                "endpoint": "video_workflow"
+            }
+            page = self.client.page if self.client else None
+            save_error_log(e, context=context, page=page)
+
             self._move_to_completed(job_id, success=False, error=str(e))
 
     def _update_job_status(self, job_id: str, status: str, **kwargs):

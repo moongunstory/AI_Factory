@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from worker.processor import VideoWorkflowProcessor
+from backend.core.debug_logger import save_error_log
 
 
 def main():
@@ -65,6 +66,11 @@ def main():
 
     except Exception as e:
         print(f"\n❌ Worker 오류: {e}")
+
+        # Save worker-level error to debug directory
+        context = {"component": "worker_main_loop"}
+        save_error_log(e, context=context)
+
         processor.cleanup()
 
 
