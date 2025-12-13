@@ -144,6 +144,14 @@ export default function Home() {
   const [story, setStory] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // GPT 워크플로우 결과 상태
+  const [workflowResults, setWorkflowResults] = useState<{
+    expanded_story: string;
+    storyboard: string;
+    prompts: string;
+  } | null>(null);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
+
   // 워크플로우 상태
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [workflowNodes, setWorkflowNodes] = useState<WorkflowNode[]>(
@@ -230,33 +238,42 @@ ${worldviewInput}
     }, 2000);
   };
 
-  const handleGenerate = () => {
-    // 1. 뷰 모드 전환
-    setViewMode('workflow');
+  const handleGenerate = async () => {
+    if (!story.trim()) {
+      alert("스토리를 먼저 입력해주세요!");
+      return;
+    }
 
-    // 2. 워크플로우 노드 업데이트 (유저 스토리 주입)
-    // 2. 워크플로우 노드 업데이트 (유저 스토리 주입)
-    const updatedNodes = workflowNodes.map(node => {
-      // 유저 인풋 노드 업데이트
-      if (node.type === 'user_input') {
-        return {
-          ...node,
-          data: { ...node.data, input: story }
-        };
-      }
-      // [FIX] LLM 확장 노드에도 스토리 주입 (바로 사용 가능하도록)
-      if (node.type === 'llm_expand') {
-        return {
-          ...node,
-          data: { ...node.data, input: story }
-        };
-      }
-      return node;
-    });
-    setWorkflowNodes(updatedNodes);
+    setIsGenerating(true);
+    setWorkflowError(null);
+    setWorkflowResults(null);
 
-    // 3. 안내
-    alert("워크플로우 모드로 전환되었습니다. '이야기 확장' 노드를 클릭하여 GPT 확장을 시작하세요.");
+    try {
+      // API 호출 - 3단계 GPT 워크플로우 실행
+      const response = await fetch("http://localhost:8000/api/automation/generate-video-workflow", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ story }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "워크플로우 실행 중 오류가 발생했습니다.");
+      }
+
+      const data = await response.json();
+      setWorkflowResults(data);
+      alert("✅ GPT 워크플로우가 성공적으로 완료되었습니다!");
+
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
+      setWorkflowError(errorMessage);
+      alert(`❌ 오류: ${errorMessage}\n\n브라우저에서 ChatGPT에 로그인되어 있는지 확인해주세요.`);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleLoadSettings = () => {
@@ -556,21 +573,91 @@ ${worldviewInput}
 
                       {/* 스토리 입력 (단편) */}
                       {mode === "short" && (
-                        <Card shadow="sm" padding="lg" radius="md" withBorder>
-                          <Stack gap="md">
-                            <Group gap="xs">
-                              <IconSparkles size={20} className="text-cyan-500" />
-                              <Text fw={600} size="lg">스토리 입력</Text>
-                            </Group>
-                            <Textarea
-                              placeholder="예: 네온 비 속에서 명상하는 사이버네틱 사무라이, 도시의 불빛이 반사되는 가운데 내면의 평화를 찾는다..."
-                              minRows={4}
-                              autosize
-                              value={story}
-                              onChange={(e) => setStory(e.currentTarget.value)}
-                            />
-                          </Stack>
-                        </Card>
+                        <>
+                          <Card shadow="sm" padding="lg" radius="md" withBorder>
+                            <Stack gap="md">
+                              <Group gap="xs">
+                                <IconSparkles size={20} className="text-cyan-500" />
+                                <Text fw={600} size="lg">스토리 입력</Text>
+                              </Group>
+                              <Textarea
+                                placeholder="예: 네온 비 속에서 명상하는 사이버네틱 사무라이, 도시의 불빛이 반사되는 가운데 내면의 평화를 찾는다..."
+                                minRows={4}
+                                autosize
+                                value={story}
+                                onChange={(e) => setStory(e.currentTarget.value)}
+                              />
+                            </Stack>
+                          </Card>
+
+                          {/* GPT 워크플로우 결과 표시 */}
+                          {workflowResults && (
+                            <Card shadow="md" padding="lg" radius="md" withBorder style={{ borderColor: "var(--mantine-color-green-5)" }}>
+                              <Stack gap="lg">
+                                <Group gap="xs">
+                                  <IconBrain size={24} className="text-green-500" />
+                                  <Text fw={700} size="xl" c="green">✅ GPT 워크플로우 완료!</Text>
+                                </Group>
+
+                                {/* 1. 확장된 이야기 */}
+                                <div>
+                                  <Group gap="xs" mb="sm">
+                                    <Badge color="violet" variant="filled">1단계</Badge>
+                                    <Text fw={600} size="md">📖 확장된 이야기 (Fable Forge)</Text>
+                                  </Group>
+                                  <Paper p="md" radius="md" withBorder style={{ background: "var(--mantine-color-dark-6)" }}>
+                                    <ScrollArea h={200}>
+                                      <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+                                        {workflowResults.expanded_story}
+                                      </Text>
+                                    </ScrollArea>
+                                  </Paper>
+                                </div>
+
+                                <Divider />
+
+                                {/* 2. 스토리보드 */}
+                                <div>
+                                  <Group gap="xs" mb="sm">
+                                    <Badge color="blue" variant="filled">2단계</Badge>
+                                    <Text fw={600} size="md">🎬 스토리보드 (Storyboard GPT)</Text>
+                                  </Group>
+                                  <Paper p="md" radius="md" withBorder style={{ background: "var(--mantine-color-dark-6)" }}>
+                                    <ScrollArea h={200}>
+                                      <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+                                        {workflowResults.storyboard}
+                                      </Text>
+                                    </ScrollArea>
+                                  </Paper>
+                                </div>
+
+                                <Divider />
+
+                                {/* 3. 프롬프트 */}
+                                <div>
+                                  <Group gap="xs" mb="sm">
+                                    <Badge color="cyan" variant="filled">3단계</Badge>
+                                    <Text fw={600} size="md">✨ 생성 프롬프트 (Storyboard Maker)</Text>
+                                  </Group>
+                                  <Paper p="md" radius="md" withBorder style={{ background: "var(--mantine-color-dark-6)" }}>
+                                    <ScrollArea h={200}>
+                                      <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+                                        {workflowResults.prompts}
+                                      </Text>
+                                    </ScrollArea>
+                                  </Paper>
+                                </div>
+                              </Stack>
+                            </Card>
+                          )}
+
+                          {/* 에러 표시 */}
+                          {workflowError && (
+                            <Alert variant="light" color="red" title="오류 발생" icon={<IconBrain size={18} />}>
+                              {workflowError}
+                            </Alert>
+                          )}
+                        </>
                       )}
 
                       {/* 시리즈 컨셉 입력 (개선된 UI) */}

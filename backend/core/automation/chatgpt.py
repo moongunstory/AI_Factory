@@ -4,9 +4,15 @@ import asyncio
 from playwright.async_api import async_playwright, Page, BrowserContext
 
 class ChatGPTClient:
+    # 3개의 커스텀 GPT URL
+    GPT_URLS = {
+        "fable_forge": "https://chatgpt.com/g/g-mBqCBRe17-fable-forge",
+        "storyboard_gpt": "https://chatgpt.com/g/g-fPCGX4kUc-storyboard-gpt",
+        "storyboard_maker": "https://chatgpt.com/g/g-jtTGRSqZ9-storyboard-maker"
+    }
+
     def __init__(self, user_data_dir: str = "chrome_profile"):
         self.user_data_dir = os.path.abspath(user_data_dir)
-        self.target_url = "https://chatgpt.com/g/g-mBqCBRe17-fable-forge"
         self.browser_context: BrowserContext = None
         self.page: Page = None
         self.playwright = None
@@ -39,21 +45,23 @@ class ChatGPTClient:
         else:
             self.page = await self.browser_context.new_page()
 
-    async def ensure_on_target_page(self):
-        """Navigates to the Fable Forge GPT if not already there."""
-        if self.page.url != self.target_url:
-            await self.page.goto(self.target_url)
+    async def ensure_on_target_page(self, gpt_url: str):
+        """Navigates to the specified GPT if not already there."""
+        if self.page.url != gpt_url:
+            await self.page.goto(gpt_url)
             # Wait for potential redirects or loading
             await self.page.wait_for_load_state("networkidle")
+            # 페이지 로드 후 약간의 대기
+            await asyncio.sleep(1)
 
-    async def send_message_and_get_response(self, text: str):
+    async def send_message_and_get_response(self, text: str, gpt_url: str):
         """
         Types the text, sends it, waits for generation, and returns the response.
         """
         if not self.page:
             await self.start_browser()
-        
-        await self.ensure_on_target_page()
+
+        await self.ensure_on_target_page(gpt_url)
 
         # Check if we are logged in by looking for the textarea
         try:
@@ -124,3 +132,67 @@ class ChatGPTClient:
     async def close(self):
         if self.browser_context:
             await self.browser_context.close()
+
+    async def run_video_generation_workflow(self, initial_story: str):
+        """
+        3단계 워크플로우를 실행합니다:
+        1. Fable Forge: 이야기 확장
+        2. Storyboard GPT: 스토리보드 작성
+        3. Storyboard Maker: 프롬프트 생성
+
+        Returns:
+            dict: {
+                "expanded_story": str,
+                "storyboard": str,
+                "prompts": str
+            }
+        """
+        results = {}
+
+        try:
+            # 브라우저 시작
+            if not self.page:
+                await self.start_browser()
+
+            print("=== Step 1: 이야기 확장 (Fable Forge) ===")
+            # Step 1: Fable Forge - 이야기 확장
+            fable_prompt = f"{initial_story}\n\n이 이야기를 기승전결이 확실한, 재밌는 이야기로 풍성하게 만들어줘"
+            expanded_story = await self.send_message_and_get_response(
+                fable_prompt,
+                self.GPT_URLS["fable_forge"]
+            )
+            results["expanded_story"] = expanded_story
+            print(f"✓ 이야기 확장 완료 (길이: {len(expanded_story)} 문자)")
+
+            # 다음 단계로 넘어가기 전 잠시 대기
+            await asyncio.sleep(2)
+
+            print("=== Step 2: 스토리보드 작성 (Storyboard GPT) ===")
+            # Step 2: Storyboard GPT - 스토리보드 작성
+            storyboard_prompt = f"{expanded_story}\n\n이 이야기를 스토리보드로 만들어봐"
+            storyboard = await self.send_message_and_get_response(
+                storyboard_prompt,
+                self.GPT_URLS["storyboard_gpt"]
+            )
+            results["storyboard"] = storyboard
+            print(f"✓ 스토리보드 작성 완료 (길이: {len(storyboard)} 문자)")
+
+            # 다음 단계로 넘어가기 전 잠시 대기
+            await asyncio.sleep(2)
+
+            print("=== Step 3: 프롬프트 생성 (Storyboard Maker) ===")
+            # Step 3: Storyboard Maker - 프롬프트 생성
+            prompt_generation_prompt = f"{storyboard}\n\n이 스토리보드를 프롬프트로 만들어봐"
+            prompts = await self.send_message_and_get_response(
+                prompt_generation_prompt,
+                self.GPT_URLS["storyboard_maker"]
+            )
+            results["prompts"] = prompts
+            print(f"✓ 프롬프트 생성 완료 (길이: {len(prompts)} 문자)")
+
+            print("=== 워크플로우 완료! ===")
+            return results
+
+        except Exception as e:
+            print(f"워크플로우 에러: {e}")
+            raise e
