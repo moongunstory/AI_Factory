@@ -336,6 +336,16 @@ class ChatGPTClient:
             print("\n📍 Step 1: Fable Forge (Story Expansion)")
             fable_prompt = f"""다음 간단한 스토리를 기승전결이 명확한 완성도 높은 단편 이야기로 확장해주세요.
 
+물론입니다 😊
+확장할 간단한 스토리 원문을 먼저 보내주세요.
+
+짧은 줄거리나 메모 형태여도 괜찮고,
+
+등장인물
+배경
+핵심 사건
+중 일부만 있어도 기승전결이 분명한 완성도 높은 단편 이야기로 자연스럽게 확장해 드릴게요.
+
 {initial_story}
 
 요구사항:
@@ -344,7 +354,9 @@ class ChatGPTClient:
 - 명확한 기승전결 구조 (도입 → 전개 → 클라이맥스 → 결말)
 - 생동감 있는 묘사와 감정선
 - 캐릭터의 동기와 갈등이 명확히 드러날 것
-- 독자를 몰입시킬 수 있는 디테일과 긴장감"""
+- 독자를 몰입시킬 수 있는 디테일과 긴장감
+
+이걸 한 채팅에 다 넣어서 말해야지. 이야기랑 요구사항을 한 채팅에 넣고 바로 그걸 받아야 함."""
 
             results["expanded_story"] = self.send_message_and_get_response(
                 fable_prompt, self.GPT_URLS["fable_forge"]
