@@ -29,7 +29,8 @@ import {
     IconMovie,
     IconBrandOpenai,
     IconBrandGoogle,
-    IconServer
+    IconServer,
+    IconBrain
 } from '@tabler/icons-react';
 import { WorkflowNode, AIModelConfig } from './WorkflowTypes';
 
