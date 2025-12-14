@@ -51,7 +51,7 @@ start /min "Frontend Server" cmd /k "cd /d %~dp0\frontend && npm run dev"
 
 echo.
 echo Waiting for servers to be ready...
-timeout /t 5 /nobreak > nul
+timeout /t 10 /nobreak > nul
 
 echo Opening browser...
 start http://localhost:3000
@@ -129,7 +129,14 @@ echo.
 cd /d "%~dp0\frontend"
 
 echo Starting Frontend Server (port 3000)...
-npm run dev
+start /min "Frontend Server" cmd /k "npm run dev"
+
+echo.
+echo Waiting for server...
+timeout /t 5 /nobreak > nul
+
+echo Opening browser...
+start http://localhost:3000
 pause
 goto end
 

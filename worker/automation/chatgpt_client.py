@@ -33,50 +33,51 @@ class ChatGPTClient:
         self.user_data_dir = SYSTEM_CHROME_PROFILE
 
     def start_browser(self):
-        """Starts the browser using System Profile (CDP first, then Launch)."""
+        """Starts the browser using System Profile via Persistent Context."""
         if self.page and not self.page.is_closed():
             return
 
         self.playwright = sync_playwright().start()
 
-        # 1. Try CDP (Preferred: Connect to running Chrome)
+        print(f"[Worker] Launching Chrome (Persistent Context)...")
+        print(f"   - User Data: {self.user_data_dir}")
+        print(f"   - Executable: {CHROME_EXECUTABLE}")
+
         try:
-            print(f"[Worker] Connecting to Chrome via CDP ({CDP_URL})...")
-            self.browser = self.playwright.chromium.connect_over_cdp(CDP_URL)
-            if self.browser.contexts:
-                self.context = self.browser.contexts[0]
-            else:
-                self.context = self.browser.new_context()
+            # Note: user_data_dir should be the ROOT 'User Data' folder, not 'Default'.
+            # We pass '--profile-directory=Default' to select the specific profile.
+            self.context = self.playwright.chromium.launch_persistent_context(
+                user_data_dir=self.user_data_dir,
+                executable_path=CHROME_EXECUTABLE,
+                headless=False,
+                args=[
+                    "--no-sandbox",
+                    "--disable-infobars",
+                    "--profile-directory=Default" 
+                ],
+                no_viewport=True  # Usually better for existing profiles to avoid resizing
+            )
             
-            # Setup Page
+            # Get the initial page
             if self.context.pages:
                 self.page = self.context.pages[0]
-                self.page.bring_to_front()
             else:
                 self.page = self.context.new_page()
             
-            print("[Worker] ✅ Connected to existing Chrome session.")
-            return
+            print("[Worker] ✅ Chrome Launched & Connected.")
 
         except Exception as e:
-            print(f"[Worker] CDP connection failed: {e}")
-            print("\n" + "="*60)
-            print("⚠️  Chrome Debug Mode가 필요합니다!")
-            print("="*60)
-            print("AI Factory는 System Chrome Profile을 사용하기 위해")
-            print("수동으로 시작된 Chrome Debug 세션에 연결해야 합니다.")
-            print()
-            print("해결 방법:")
-            print("1. 프로젝트 루트의 'start_chrome_debug.bat' 실행")
-            print("2. Chrome이 열리면 GPT Plus 로그인 확인")
-            print("3. 이 워커를 다시 실행")
-            print()
-            print("또는 수동 실행:")
-            print('  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"')
-            print('  --remote-debugging-port=9222')
-            print('  --user-data-dir="%LOCALAPPDATA%\\Google\\Chrome\\User Data"')
-            print("="*60)
-            raise ConnectionError("Chrome Debug Mode에 연결할 수 없습니다. 위 지침을 따라주세요.")
+            print(f"\n❌ Chrome Launch Failed: {e}")
+            if "Target closed" in str(e) or "SingletonLock" in str(e) or "user data directory is already in use" in str(e):
+                print("\n" + "="*60)
+                print("⚠️  Chrome이 이미 실행 중입니다!")
+                print("="*60)
+                print("Persistent Context 모드는 Chrome이 완전히 종료된 상태여야 합니다.")
+                print("1. 실행 중인 모든 Chrome 창을 닫아주세요.")
+                print("2. 트레이 아이콘 등 백그라운드 프로세스도 확인해주세요.")
+                print("3. 다시 시도해주세요.")
+                print("="*60 + "\n")
+            raise e
 
 
     def _human_delay(self, min_s=0.5, max_s=1.5):
@@ -292,35 +293,80 @@ class ChatGPTClient:
 
     def run_video_generation_workflow(self, initial_story: str) -> dict:
         """
-        Orchestrates the 3-step workflow.
+        Orchestrates the 3-step workflow with detailed prompting.
         """
         results = {}
         try:
             print("\n=== 🚀 Starting Smart Workflow (System Profile) ===")
             
-            # Step 1
+            # Step 1: Story Expansion
             print("\n📍 Step 1: Fable Forge (Story Expansion)")
-            fable_prompt = f"{initial_story}\n\n이 이야기를 기승전결이 확실한, 재밌는 이야기로 풍성하게 만들어줘"
+            fable_prompt = f"""다음 간단한 스토리를 기승전결이 명확한 완성도 높은 단편 이야기로 확장해주세요.
+
+{initial_story}
+
+요구사항:
+- 사담, 부연설명, 메타 코멘트 일체 제외
+- 오직 순수한 스토리 텍스트만 작성
+- 명확한 기승전결 구조 (도입 → 전개 → 클라이맥스 → 결말)
+- 생동감 있는 묘사와 감정선
+- 캐릭터의 동기와 갈등이 명확히 드러날 것
+- 독자를 몰입시킬 수 있는 디테일과 긴장감"""
+
             results["expanded_story"] = self.send_message_and_get_response(
                 fable_prompt, self.GPT_URLS["fable_forge"]
             )
             print(f"✅ Step 1 Done. Length: {len(results['expanded_story'])}")
             
-            self._human_delay(2, 4)
+            self._human_delay(3, 5)
 
-            # Step 2
+            # Step 2: Storyboard Generation
             print("\n📍 Step 2: Storyboard GPT")
-            sb_prompt = f"{results['expanded_story']}\n\n이 이야기를 스토리보드로 만들어봐"
+            sb_prompt = f"""다음 스토리를 영상 제작을 위한 상세 스토리보드로 변환해주세요.
+
+{results['expanded_story']}
+
+요구사항:
+- 사담, 설명, 메타 코멘트 일체 제외
+- 각 씬(Scene)을 명확히 구분
+- 씬마다 다음 요소 포함:
+  * 씬 번호
+  * 시간대/장소
+  * 등장인물과 동작
+  * 카메라 앵글/구도 제안
+  * 핵심 감정/분위기
+- 영상으로 시각화 가능한 구체적 묘사
+- 씬 간 자연스러운 전환과 연결성
+- 전체 러닝타임 1-3분 분량으로 최적화"""
+
             results["storyboard"] = self.send_message_and_get_response(
                 sb_prompt, self.GPT_URLS["storyboard_gpt"]
             )
             print(f"✅ Step 2 Done. Length: {len(results['storyboard'])}")
 
-            self._human_delay(2, 4)
+            self._human_delay(3, 5)
 
-            # Step 3
+            # Step 3: Video Prompts Generation
             print("\n📍 Step 3: Storyboard Maker (Prompt Gen)")
-            pm_prompt = f"{results['storyboard']}\n\n이 스토리보드를 프롬프트로 만들어봐"
+            pm_prompt = f"""다음 스토리보드를 바탕으로 AI 이미지 생성을 위한 최적화된 프롬프트를 제작해주세요.
+
+{results['storyboard']}
+
+요구사항:
+- 사담, 설명, 메타 코멘트 일체 제외
+- 각 씬별로 독립적인 프롬프트 생성
+- 프롬프트 구성 요소:
+  * 주요 피사체와 동작 (명확하고 구체적으로)
+  * 배경과 환경 묘사
+  * 조명과 분위기 (lighting, mood)
+  * 카메라 앵글과 구도
+  * 아트 스타일/화풍 지정
+  * 화질 관련 키워드 (high quality, detailed, cinematic 등)
+- Stable Diffusion/Midjourney 최적화 형식
+- 부정 프롬프트(Negative prompt) 별도 제공
+- 영문 프롬프트로 작성
+- 일관된 캐릭터/스타일 유지를 위한 키워드 포함"""
+
             results["prompts"] = self.send_message_and_get_response(
                 pm_prompt, self.GPT_URLS["storyboard_maker"]
             )

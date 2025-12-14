@@ -11,7 +11,7 @@ from backend.core.debug_logger import save_error_log
 class VideoWorkflowProcessor:
     """비디오 생성 워크플로우 처리기"""
 
-    def __init__(self, queue_dir: str = ".data/queue", results_dir: str = ".data/results"):
+    def __init__(self, queue_dir: str = ".data/queue", results_dir: str = ".data/output"):
         self.queue_dir = Path(queue_dir)
         self.results_dir = Path(results_dir)
         self.client: ChatGPTClient = None
