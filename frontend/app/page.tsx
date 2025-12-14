@@ -249,6 +249,14 @@ ${worldviewInput}
       return;
     }
 
+    // 워크플로우 화면으로 전환
+    setViewMode("workflow");
+
+    // 첫 번째 노드에 스토리 입력
+    setWorkflowNodes(prev => prev.map((node, idx) =>
+      idx === 0 ? { ...node, data: { ...node.data, input: story } } : node
+    ));
+
     setIsGenerating(true);
     setWorkflowError(null);
     setWorkflowResults(null);
@@ -465,7 +473,12 @@ ${worldviewInput}
 
       <AppShell.Main>
         {viewMode === 'workflow' ? (
-          <WorkflowEditor initialNodes={workflowNodes} />
+          <WorkflowEditor
+            initialNodes={workflowNodes}
+            onNodeUpdate={(updatedNode) => {
+              setWorkflowNodes(prev => prev.map(n => n.id === updatedNode.id ? updatedNode : n));
+            }}
+          />
         ) : (
           <>
             {/* 대시보드 뷰 */}
