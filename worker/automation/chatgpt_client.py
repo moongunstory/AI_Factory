@@ -9,14 +9,18 @@ from typing import Optional, Dict
 from playwright.sync_api import sync_playwright, Page, BrowserContext, TimeoutError as PlaywrightTimeoutError, Locator
 
 # --- Configuration ---
-SYSTEM_CHROME_PROFILE = r"C:\Users\moong\AppData\Local\Google\Chrome\User Data"
+# Use dedicated automation profile to avoid conflicts with running Chrome instances
+AUTOMATION_PROFILE = Path.home() / ".ai_factory_chrome_profile"
 CHROME_EXECUTABLE = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 CDP_URL = "http://127.0.0.1:9222"  # IPv4 명시 (localhost는 IPv6로 해석될 수 있음)
 
 class ChatGPTClient:
     """
-    Robust, human-like automation for ChatGPT using the local System Chrome Profile.
+    Robust, human-like automation for ChatGPT using a dedicated automation profile.
     Implements a State Machine for response detection and avoids API-like behavior.
+
+    Uses a separate Chrome profile to avoid conflicts with running Chrome instances.
+    First run will require ChatGPT login.
     """
 
     GPT_URLS = {
@@ -30,53 +34,82 @@ class ChatGPTClient:
         self.browser = None  # CDP browser instance
         self.context: BrowserContext = None
         self.page: Page = None
-        self.user_data_dir = SYSTEM_CHROME_PROFILE
+        self.user_data_dir = AUTOMATION_PROFILE
 
     def start_browser(self):
-        """Starts the browser using System Profile via Persistent Context."""
+        """Starts the browser using a dedicated automation profile."""
         if self.page and not self.page.is_closed():
             return
 
+        # Ensure automation profile directory exists
+        profile_path = Path(self.user_data_dir)
+        profile_path.mkdir(parents=True, exist_ok=True)
+
         self.playwright = sync_playwright().start()
 
-        print(f"[Worker] Launching Chrome (Persistent Context)...")
-        print(f"   - User Data: {self.user_data_dir}")
+        # Check if this is first run (profile is empty or minimal files)
+        is_first_run = len(list(profile_path.glob("*"))) < 5
+
+        print(f"[Worker] Launching Chrome (Dedicated Automation Profile)...")
+        print(f"   - Profile: {profile_path}")
         print(f"   - Executable: {CHROME_EXECUTABLE}")
 
+        if is_first_run:
+            print("\n" + "="*60)
+            print("📋 첫 실행 - ChatGPT 로그인 필요")
+            print("="*60)
+            print("브라우저가 열리면 ChatGPT에 로그인해주세요.")
+            print("로그인 세션은 이 프로필에 저장되어 재사용됩니다.")
+            print("="*60 + "\n")
+
         try:
-            # Note: user_data_dir should be the ROOT 'User Data' folder, not 'Default'.
-            # We pass '--profile-directory=Default' to select the specific profile.
+            # Use dedicated automation profile (independent from system Chrome)
             self.context = self.playwright.chromium.launch_persistent_context(
-                user_data_dir=self.user_data_dir,
+                user_data_dir=str(profile_path),  # Convert Path to string
                 executable_path=CHROME_EXECUTABLE,
                 headless=False,
                 args=[
                     "--no-sandbox",
                     "--disable-infobars",
-                    "--profile-directory=Default" 
+                    "--disable-blink-features=AutomationControlled",  # Hide automation detection
                 ],
-                no_viewport=True  # Usually better for existing profiles to avoid resizing
+                no_viewport=True,  # Better for user interaction
+                ignore_default_args=["--enable-automation"],  # Remove automation flag
             )
-            
+
             # Get the initial page
             if self.context.pages:
                 self.page = self.context.pages[0]
             else:
                 self.page = self.context.new_page()
-            
-            print("[Worker] ✅ Chrome Launched & Connected.")
+
+            print("[Worker] ✅ Chrome Launched Successfully")
+
+            if is_first_run:
+                print("\n💡 첫 실행이므로 ChatGPT 로그인을 완료해주세요.")
+                print("   로그인 후 워커를 계속 사용할 수 있습니다.\n")
 
         except Exception as e:
             print(f"\n❌ Chrome Launch Failed: {e}")
-            if "Target closed" in str(e) or "SingletonLock" in str(e) or "user data directory is already in use" in str(e):
+
+            # More helpful error messages
+            error_str = str(e)
+            if "Target closed" in error_str or "browser has been closed" in error_str:
                 print("\n" + "="*60)
-                print("⚠️  Chrome이 이미 실행 중입니다!")
+                print("⚠️  Chrome 시작 실패")
                 print("="*60)
-                print("Persistent Context 모드는 Chrome이 완전히 종료된 상태여야 합니다.")
-                print("1. 실행 중인 모든 Chrome 창을 닫아주세요.")
-                print("2. 트레이 아이콘 등 백그라운드 프로세스도 확인해주세요.")
-                print("3. 다시 시도해주세요.")
+                print("가능한 원인:")
+                print("1. Chrome이 다른 프로세스에 의해 종료됨")
+                print("2. Chrome 설치 경로 확인 필요")
+                print(f"   현재: {CHROME_EXECUTABLE}")
+                print("3. 프로필 디렉토리 권한 문제")
+                print(f"   현재: {profile_path}")
+                print("\n해결 방법:")
+                print("- Chrome 경로가 올바른지 확인")
+                print("- 프로필 디렉토리에 쓰기 권한이 있는지 확인")
+                print("- 바이러스 백신/보안 소프트웨어가 차단하는지 확인")
                 print("="*60 + "\n")
+
             raise e
 
 
