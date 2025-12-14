@@ -77,28 +77,96 @@ export function NodeControlPanel({ node, onClose, onUpdate, onRegenerate }: Node
                 return (
                     <Stack>
                         <Alert variant="light" color="blue" title="초기 아이디어">
-                            자유롭게 상상하는 이야기를 적어주세요.
+                            자유롭게 상상하는 이야기를 적어주세요. 입력 후 엔터를 누르면 자동으로 GPT 확장이 시작됩니다.
                         </Alert>
                         <Textarea
                             label="이야기 입력"
-                            placeholder="예: 사이버펑크 도시의 야경..."
+                            placeholder="예: 네온 비 속에서 명상하는 사이버네틱 사무라이, 도시의 불빛이 반사되는 가운데 내면의 평화를 찾는다..."
                             minRows={6}
-                            defaultValue="Mock input data..."
+                            value={node.data?.input || ""}
+                            onChange={(e) => {
+                                const updatedNode = {
+                                    ...node,
+                                    data: { ...node.data, input: e.currentTarget.value }
+                                };
+                                onUpdate(updatedNode);
+                            }}
+                            onKeyDown={async (e) => {
+                                if (e.key === 'Enter' && e.ctrlKey) {
+                                    // Ctrl+Enter로 GPT 확장 자동 실행
+                                    const input = node.data?.input;
+                                    if (!input || !input.trim()) {
+                                        alert("이야기를 먼저 입력해주세요!");
+                                        return;
+                                    }
+
+                                    // 다음 노드(llm_expand)를 processing 상태로 변경
+                                    alert(`GPT 확장을 시작합니다...\n(내용: ${input.substring(0, 30)}...)`);
+
+                                    try {
+                                        const response = await fetch('http://localhost:8000/api/automation/expand-story', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ story: input })
+                                        });
+
+                                        if (!response.ok) {
+                                            const errorHttp = await response.json();
+                                            throw new Error(errorHttp.detail || 'Automation failed');
+                                        }
+
+                                        const data = await response.json();
+
+                                        // 현재 노드를 완료 상태로 변경
+                                        onUpdate({
+                                            ...node,
+                                            status: 'completed',
+                                            data: { ...node.data, input }
+                                        });
+
+                                        alert("확장 완료! 다음 노드를 확인하세요.");
+                                    } catch (e) {
+                                        console.error(e);
+                                        alert("오류 발생: " + e + "\n\n백엔드 서버가 켜져있는지 확인해주세요.");
+                                    }
+                                }
+                            }}
                         />
+                        <Text size="xs" c="dimmed">💡 Ctrl+Enter를 누르면 바로 GPT 확장이 시작됩니다.</Text>
                     </Stack>
                 );
 
             case 'llm_expand':
+            case 'storyboard':
             case 'prompt_gen':
                 return (
                     <Stack>
                         <Textarea
-                            label="생성된 텍스트"
+                            label={
+                                node.type === 'llm_expand' ? "확장된 이야기" :
+                                node.type === 'storyboard' ? "스토리보드" :
+                                "생성된 프롬프트"
+                            }
                             minRows={10}
                             value={node.data?.output || ""}
                             onChange={(e) => onUpdate({ ...node, data: { ...node.data, output: e.currentTarget.value } })}
-                            placeholder={node.type === 'llm_expand' ? "GPT 확장을 실행하면 이야기가 여기에 표시됩니다." : "Scene 1: ..."}
+                            placeholder={
+                                node.type === 'llm_expand' ? "GPT 확장을 실행하면 이야기가 여기에 표시됩니다." :
+                                node.type === 'storyboard' ? "스토리보드가 여기에 표시됩니다." :
+                                "프롬프트가 여기에 표시됩니다."
+                            }
+                            readOnly={node.status === 'completed'}
                         />
+                        {node.status === 'pending' && (
+                            <Alert variant="light" color="yellow" icon={<IconBrain size={16} />}>
+                                이전 단계를 완료하면 이 노드가 활성화됩니다.
+                            </Alert>
+                        )}
+                        {node.status === 'completed' && (
+                            <Alert variant="light" color="green" icon={<IconCheck size={16} />}>
+                                ✅ 작업이 완료되었습니다. 필요시 수정하거나 다음 단계로 진행하세요.
+                            </Alert>
+                        )}
                     </Stack>
                 );
 

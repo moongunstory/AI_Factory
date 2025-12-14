@@ -23,6 +23,8 @@ import { NodeControlPanel } from './NodeControlPanel';
 
 // Custom Node Component (can be expanded later)
 const CustomNode = ({ data }: { data: WorkflowNode }) => {
+    const isProcessing = data.status === 'processing';
+
     return (
         <Paper
             shadow="sm"
@@ -31,10 +33,12 @@ const CustomNode = ({ data }: { data: WorkflowNode }) => {
             withBorder
             style={{
                 minWidth: 200,
-                borderColor: data.status === 'processing' ? 'var(--mantine-color-violet-5)' :
+                borderColor: data.status === 'processing' ? 'var(--mantine-color-green-5)' :
                     data.status === 'completed' ? 'var(--mantine-color-green-5)' :
                         undefined,
                 background: 'var(--mantine-color-dark-7)',
+                borderWidth: isProcessing ? '3px' : '1px',
+                animation: isProcessing ? 'pulse-green 1.5s ease-in-out infinite' : 'none',
             }}
         >
             <Group justify="space-between" mb="xs">
@@ -42,7 +46,7 @@ const CustomNode = ({ data }: { data: WorkflowNode }) => {
                     size="md"
                     radius="md"
                     variant={data.status === 'processing' ? 'filled' : 'light'}
-                    color={data.status === 'completed' ? 'green' : 'violet'}
+                    color={data.status === 'completed' ? 'green' : data.status === 'processing' ? 'green' : 'violet'}
                 >
                     <Text size="sm">{data.icon}</Text>
                 </ThemeIcon>
@@ -51,7 +55,7 @@ const CustomNode = ({ data }: { data: WorkflowNode }) => {
                     variant="light"
                     color={
                         data.status === 'completed' ? 'green' :
-                            data.status === 'processing' ? 'violet' :
+                            data.status === 'processing' ? 'green' :
                                 data.status === 'error' ? 'red' : 'gray'
                     }
                 >
@@ -70,11 +74,19 @@ const nodeTypes = {
 
 interface WorkflowEditorProps {
     initialNodes: WorkflowNode[];
+    onNodeUpdate?: (updatedNode: WorkflowNode) => void;
 }
 
-export function WorkflowEditor({ initialNodes }: WorkflowEditorProps) {
+export function WorkflowEditor({ initialNodes, onNodeUpdate }: WorkflowEditorProps) {
+    const [workflowNodes, setWorkflowNodes] = React.useState<WorkflowNode[]>(initialNodes);
+
+    // Update internal state when initialNodes changes
+    React.useEffect(() => {
+        setWorkflowNodes(initialNodes);
+    }, [initialNodes]);
+
     // Convert our WorkflowNodes to ReactFlow Nodes
-    const initialFlowNodes: Node[] = initialNodes.map((node) => ({
+    const flowNodes: Node[] = workflowNodes.map((node) => ({
         id: node.id,
         type: 'custom',
         position: node.position,
@@ -82,16 +94,21 @@ export function WorkflowEditor({ initialNodes }: WorkflowEditorProps) {
     }));
 
     // Create simple edges (linear flow for now)
-    const initialEdges: Edge[] = initialNodes.slice(0, -1).map((node, index) => ({
-        id: `e-${node.id}-${initialNodes[index + 1].id}`,
+    const initialEdges: Edge[] = workflowNodes.slice(0, -1).map((node, index) => ({
+        id: `e-${node.id}-${workflowNodes[index + 1].id}`,
         source: node.id,
-        target: initialNodes[index + 1].id,
+        target: workflowNodes[index + 1].id,
         animated: true,
         style: { stroke: 'var(--mantine-color-violet-5)' },
     }));
 
-    const [nodes, setNodes, onNodesChange] = useNodesState(initialFlowNodes);
+    const [nodes, setNodes, onNodesChange] = useNodesState(flowNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+    // Update ReactFlow nodes when workflowNodes changes
+    React.useEffect(() => {
+        setNodes(flowNodes);
+    }, [workflowNodes, setNodes]);
 
     /* Node Selection & Panel Logic */
     const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
@@ -103,13 +120,16 @@ export function WorkflowEditor({ initialNodes }: WorkflowEditorProps) {
     const closePanel = () => setSelectedNodeId(null);
 
     // Find user data for selected node
-    const selectedNodeData = initialNodes.find(n => n.id === selectedNodeId);
+    const selectedNodeData = workflowNodes.find(n => n.id === selectedNodeId);
 
     const handleNodeUpdate = (updatedNode: WorkflowNode) => {
-        // In a real app, you would update the 'nodes' state here and propagate changes.
-        // For UI demo, we'll just log or update the specific node in the local state if needed.
-        console.log("Update Node:", updatedNode);
-        // TODO: Implement state update logic
+        // Update local state
+        setWorkflowNodes(prev => prev.map(n => n.id === updatedNode.id ? updatedNode : n));
+
+        // Notify parent component
+        if (onNodeUpdate) {
+            onNodeUpdate(updatedNode);
+        }
     };
 
     const handleRegenerate = () => {
@@ -155,7 +175,15 @@ export function WorkflowEditor({ initialNodes }: WorkflowEditorProps) {
                     style={{ zIndex: 5, background: 'rgba(26, 27, 30, 0.8)', backdropFilter: 'blur(5px)' }}
                 >
                     <Stack gap="xs">
-                        <Button leftSection={<IconPlayerPlay size={16} />} variant="gradient" gradient={{ from: 'violet', to: 'cyan' }}>
+                        <Button
+                            leftSection={<IconPlayerPlay size={16} />}
+                            variant="gradient"
+                            gradient={{ from: 'violet', to: 'cyan' }}
+                            onClick={() => {
+                                // 첫 번째 노드부터 순차적으로 processing 상태로 변경
+                                alert("워크플로우 실행 기능은 각 노드를 클릭하여 수동으로 진행하거나, 이야기 인풋 노드에서 Ctrl+Enter로 시작할 수 있습니다.");
+                            }}
+                        >
                             Run Workflow
                         </Button>
                         <Button leftSection={<IconSettings size={16} />} variant="light" color="gray">
