@@ -3,7 +3,7 @@ models/
 .venv/
 .vscode/
 debug/
-
+.data/
 
 # Python
 __pycache__/
@@ -60,7 +60,7 @@ Thumbs.db
 output/
 
 # Runtime Data (queue, results, sessions, browser profiles)
-.data/
+# .data/
 
 # Legacy Browser Profile Data
 .chrome_profile/

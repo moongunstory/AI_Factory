@@ -1,211 +1,352 @@
-"""동기 Playwright ChatGPT 클라이언트 - asyncio 충돌 없음"""
+"""Robust ChatGPT Client - Smart Automation & System Profile Support"""
 import os
 import time
+import random
+import sys
 from pathlib import Path
-from playwright.sync_api import sync_playwright, Page, BrowserContext, TimeoutError as PlaywrightTimeoutError
+from typing import Optional, Dict
 
+from playwright.sync_api import sync_playwright, Page, BrowserContext, TimeoutError as PlaywrightTimeoutError, Locator
+
+# --- Configuration ---
+SYSTEM_CHROME_PROFILE = r"C:\Users\moong\AppData\Local\Google\Chrome\User Data"
+CHROME_EXECUTABLE = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+CDP_URL = "http://127.0.0.1:9222"  # IPv4 명시 (localhost는 IPv6로 해석될 수 있음)
 
 class ChatGPTClient:
-    """동기 Playwright 클라이언트 - Windows asyncio 충돌 해결"""
+    """
+    Robust, human-like automation for ChatGPT using the local System Chrome Profile.
+    Implements a State Machine for response detection and avoids API-like behavior.
+    """
 
-    # 3개의 커스텀 GPT URL
     GPT_URLS = {
         "fable_forge": "https://chatgpt.com/g/g-mBqCBRe17-fable-forge",
         "storyboard_gpt": "https://chatgpt.com/g/g-fPCGX4kUc-storyboard-gpt",
         "storyboard_maker": "https://chatgpt.com/g/g-jtTGRSqZ9-storyboard-maker"
     }
 
-    def __init__(self, user_data_dir: str = None, storage_state_path: str = None):
-        # 기본 경로를 프로젝트 루트의 .data/browser/chrome로 설정
-        if user_data_dir is None:
-            project_root = Path(__file__).parent.parent.parent
-            user_data_dir = str(project_root / ".data" / "browser" / "chrome")
-        self.user_data_dir = os.path.abspath(user_data_dir)
-
-        # Storage state 경로 (세션 persistence를 위한)
-        if storage_state_path is None:
-            project_root = Path(__file__).parent.parent.parent
-            storage_state_path = str(project_root / ".data" / "sessions" / "chatgpt.json")
-        self.storage_state_path = Path(storage_state_path)
-
+    def __init__(self):
         self.playwright = None
-        self.browser_context: BrowserContext = None
+        self.browser = None  # CDP browser instance
+        self.context: BrowserContext = None
         self.page: Page = None
+        self.user_data_dir = SYSTEM_CHROME_PROFILE
 
     def start_browser(self):
-        """브라우저 시작 (동기)"""
+        """Starts the browser using System Profile (CDP first, then Launch)."""
         if self.page and not self.page.is_closed():
             return
 
-        print("[Worker] 브라우저 시작 중... (화면 표시 모드)")
-
         self.playwright = sync_playwright().start()
 
-        # Prepare context options
-        context_options = {
-            "headless": False,  # Headed mode for debugging
-            "channel": "chrome",  # Use installed Chrome
-            "args": [
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-            ],
-            "viewport": {"width": 1280, "height": 800}
-        }
-
-        # Load storage state if exists
-        if self.storage_state_path.exists():
-            print(f"[Worker] 저장된 세션 상태 로드: {self.storage_state_path}")
-            context_options["storage_state"] = str(self.storage_state_path)
-
-        # Launch persistent context
-        self.browser_context = self.playwright.chromium.launch_persistent_context(
-            user_data_dir=self.user_data_dir,
-            **context_options
-        )
-
-        # Get the first page or create new one
-        if self.browser_context.pages:
-            self.page = self.browser_context.pages[0]
-        else:
-            self.page = self.browser_context.new_page()
-
-        print(f"[Worker] 브라우저 준비 완료")
-
-    @staticmethod
-    def _prompt_textarea_selector() -> str:
-        """Return a CSS selector for the chat input textarea."""
-        return "#prompt-textarea"
-
-    @staticmethod
-    def _assistant_message_selector() -> str:
-        """Return a CSS selector for assistant message bubbles."""
-        return 'div[data-message-author-role="assistant"]'
-
-    @staticmethod
-    def _copy_button_selector() -> str:
-        """Return a CSS selector for the copy button."""
-        return 'button[aria-label="Copy"], button[aria-label="복사"], button[aria-label="복사하기"], button[data-testid="copy-turn-action-button"]'
-
-    def ensure_on_target_page(self, gpt_url: str):
-        """Navigates to the specified GPT if not already there."""
-        if self.page.url != gpt_url:
-            print(f"[Worker] 페이지 이동: {gpt_url}")
-            self.page.goto(gpt_url, timeout=60000)
-            self.page.wait_for_load_state("networkidle")
-            time.sleep(1)
-
-    def ensure_logged_in(self):
-        """로그인 확인 및 대기"""
-        textarea_selector = self._prompt_textarea_selector()
-
+        # 1. Try CDP (Preferred: Connect to running Chrome)
         try:
-            # 먼저 짧게 확인 (5초)
-            self.page.wait_for_selector(textarea_selector, timeout=5000)
-            print("[Worker] 이미 로그인되어 있습니다.")
+            print(f"[Worker] Connecting to Chrome via CDP ({CDP_URL})...")
+            self.browser = self.playwright.chromium.connect_over_cdp(CDP_URL)
+            if self.browser.contexts:
+                self.context = self.browser.contexts[0]
+            else:
+                self.context = self.browser.new_context()
+            
+            # Setup Page
+            if self.context.pages:
+                self.page = self.context.pages[0]
+                self.page.bring_to_front()
+            else:
+                self.page = self.context.new_page()
+            
+            print("[Worker] ✅ Connected to existing Chrome session.")
             return
-        except PlaywrightTimeoutError:
-            # 로그인 필요
+
+        except Exception as e:
+            print(f"[Worker] CDP connection failed: {e}")
             print("\n" + "="*60)
-            print("⚠️  ChatGPT 로그인이 필요합니다.")
-            print("열린 브라우저 창에서 로그인을 완료해주세요.")
-            print("로그인 후 자동으로 진행됩니다. (최대 5분 대기)")
-            print("="*60 + "\n")
+            print("⚠️  Chrome Debug Mode가 필요합니다!")
+            print("="*60)
+            print("AI Factory는 System Chrome Profile을 사용하기 위해")
+            print("수동으로 시작된 Chrome Debug 세션에 연결해야 합니다.")
+            print()
+            print("해결 방법:")
+            print("1. 프로젝트 루트의 'start_chrome_debug.bat' 실행")
+            print("2. Chrome이 열리면 GPT Plus 로그인 확인")
+            print("3. 이 워커를 다시 실행")
+            print()
+            print("또는 수동 실행:")
+            print('  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"')
+            print('  --remote-debugging-port=9222')
+            print('  --user-data-dir="%LOCALAPPDATA%\\Google\\Chrome\\User Data"')
+            print("="*60)
+            raise ConnectionError("Chrome Debug Mode에 연결할 수 없습니다. 위 지침을 따라주세요.")
 
-            # 5분 대기
+
+    def _human_delay(self, min_s=0.5, max_s=1.5):
+        """Sleeps for a random duration to mimic human pauses."""
+        time.sleep(random.uniform(min_s, max_s))
+
+    def _human_type(self, selector: str, text: str):
+        """Types text with random inter-key delays."""
+        self.page.focus(selector)
+        # Random initialization delay
+        self._human_delay(0.5, 1.0)
+        
+        # Type with variance
+        self.page.type(selector, text, delay=random.randint(30, 100)) 
+        self._human_delay(0.5, 1.0)
+
+    def _human_click(self, selector: str):
+        """Moves mouse to element, hovers, pauses, then clicks."""
+        loc = self.page.locator(selector).first
+        if loc.count() > 0:
+            box = loc.bounding_box()
+            if box:
+                # Move to random point within the element
+                x = box["x"] + box["width"] * random.uniform(0.2, 0.8)
+                y = box["y"] + box["height"] * random.uniform(0.2, 0.8)
+                self.page.mouse.move(x, y, steps=10)
+                self._human_delay(0.2, 0.5)
+                self.page.mouse.click(x, y)
+            else:
+                loc.click()
+        else:
+            # Fallback
+            loc.click()
+
+    def ensure_on_page(self, url: str):
+        """Navigates to URL if not current."""
+        if self.page.url != url:
+            print(f"[Worker] Navigating to: {url}")
+            self.page.goto(url)
+            self.page.wait_for_load_state("domcontentloaded")
+            self._human_delay(1.0, 2.0)
+
+    def _get_last_assistant_message(self) -> Optional[Locator]:
+        """Finds the last assistant message using fallback selectors."""
+        # Strategy 1: Role based (Successor of current GPT UI)
+        loc = self.page.locator('div[data-message-author-role="assistant"]').last
+        if loc.count() > 0:
+            return loc
+
+        # Strategy 2: TestID based
+        # Usually Conversation turns have data-testid="conversation-turn-X"
+        # We need to find the one that does NOT have user icon or has specific class
+        # This is harder to generalize, stick to role or class.
+        
+        return None
+
+    def _monitor_response_state_machine(self, current_turn_count: int) -> str:
+        """
+        Implements the 4-phase State Machine for Robust Response Extraction.
+        
+        States:
+        1. WAIT_START: Waiting for indication of response (streaming cursor, stop button, or new message).
+        2. STREAMING: Indicated by "Stop generating" button or "streaming" class.
+        3. STABILIZING: No streaming indicators, checking if text is growing or static.
+        4. DONE: Text is stable and stream ended.
+        """
+        
+        print("[Worker] State: WAIT_START")
+        
+        # Max wait for start: 30s (GPT can be slow)
+        start_wait_limit = 30
+        start_time = time.time()
+        
+        # Selectors
+        stop_btn_sel = 'button[aria-label="Stop generating"]'
+        result_streaming_sel = '.result-streaming' # Legacy, but sometimes used
+        
+        state = "WAIT_START"
+        last_text_len = 0
+        stable_since = 0
+        
+        # Target loop frequency: ~300ms
+        while True:
+            now = time.time()
+            
+            # --- Check Indicators ---
+            stop_btn = self.page.locator(stop_btn_sel)
+            is_streaming = False
             try:
-                self.page.wait_for_selector(textarea_selector, timeout=300000)
-                print("\n✅ 로그인 확인. 세션 저장 중...\n")
+                if stop_btn.count() > 0 and stop_btn.is_visible():
+                    is_streaming = True
+            except:
+                pass
 
-                # Save session state
-                self.browser_context.storage_state(path=str(self.storage_state_path))
-                print(f"[Worker] 세션 저장 완료: {self.storage_state_path}")
+            # Count messages
+            assist_msgs = self.page.locator('div[data-message-author-role="assistant"]')
+            msg_count = assist_msgs.count()
+            
+            # --- State Transitions ---
 
-            except PlaywrightTimeoutError:
-                raise Exception("로그인 시간 초과. 다시 시도해주세요.")
+            if state == "WAIT_START":
+                # Exit conditions
+                if is_streaming:
+                    state = "STREAMING"
+                    print("[Worker] State: STREAMING (Stop button detected)")
+                elif msg_count > current_turn_count:
+                    # New message appeared but maybe processed very fast
+                    state = "STREAMING" 
+                    print("[Worker] State: STREAMING (New message detected)")
+                
+                # Timeout
+                if now - start_time > start_wait_limit:
+                    raise TimeoutError("Waited 30s but response did not start.")
+
+            elif state == "STREAMING":
+                # Logic: wait until streaming signals are gone
+                if msg_count > current_turn_count:
+                    last_msg = assist_msgs.last
+                    content = last_msg.inner_text()
+                    if not is_streaming and len(content) > last_text_len:
+                        # It grew, so it's still "effectively" streaming even if button blinked out
+                        pass
+                    
+                    if not is_streaming:
+                        # Potential transition to STABILIZING
+                        state = "STABILIZING"
+                        stable_since = now
+                        last_text_len = len(content)
+                        print(f"[Worker] State: STABILIZING (Len: {last_text_len})")
+                
+                elif not is_streaming:
+                     # Weird case: no new message yet but stop button is gone? 
+                     # Might be network delay or glitch. Go back to WAIT_START if barely any time passed
+                     if now - start_time > 5:
+                         state = "STABILIZING" # Assume done?
+
+            elif state == "STABILIZING":
+                # Logic: Ensure text length is constant for X seconds
+                current_msg = assist_msgs.last
+                current_text = current_msg.inner_text()
+                current_len = len(current_text)
+
+                if is_streaming:
+                    # Reverted to streaming?
+                    state = "STREAMING"
+                    print("[Worker] State: STREAMING (Resume)")
+                    continue
+
+                if current_len != last_text_len:
+                    # Changed! Reset timer
+                    last_text_len = current_len
+                    stable_since = now
+                    # print(f"   -> Growing... {current_len}")
+                else:
+                    # Stable?
+                    stability_duration = now - stable_since
+                    # Criteria: > 2.0s stable AND minimum length > 10
+                    if stability_duration > 2.0 and current_len > 10:
+                        print(f"[Worker] State: DONE (Stable for {stability_duration:.1f}s)")
+                        return current_text
+
+                # Safety timeout (Stabilizing too long - e.g. 2 mins)
+                if now - start_time > 180:
+                    print("[Worker] Warning: Timeout in stabilizing. Returning what we have.")
+                    return current_text
+
+            time.sleep(0.3)
 
     def send_message_and_get_response(self, text: str, gpt_url: str) -> str:
-        """메시지 전송 및 응답 수신 (동기)"""
+        """Core workflow for one interaction."""
         if not self.page:
             self.start_browser()
 
-        self.ensure_on_target_page(gpt_url)
-        self.ensure_logged_in()
+        self.ensure_on_page(gpt_url)
 
-        textarea_selector = self._prompt_textarea_selector()
-
-        # Type the message
-        print(f"[Worker] 메시지 전송: {text[:50]}...")
+        # 1. Get initial state
+        assist_msgs = self.page.locator('div[data-message-author-role="assistant"]')
         try:
-            self.page.click(textarea_selector)
-            self.page.fill(textarea_selector, text)
-            time.sleep(0.5)
-            self.page.keyboard.press("Enter")
+            initial_count = assist_msgs.count()
+        except:
+            initial_count = 0
+            
+        print(f"[Worker] Initial Message Count: {initial_count}")
+
+        # 2. Input and Send
+        textbox = '#prompt-textarea'
+        send_btn = 'button[data-testid="send-button"]'
+        
+        try:
+            self.page.wait_for_selector(textbox, state="visible", timeout=10000)
+        except:
+            print("⚠️ Cloudflare check or login needed? Waiting longer...")
+            self.page.wait_for_selector(textbox, state="visible", timeout=30000)
+
+        # Sanity: if text is empty, don't send
+        if not text.strip():
+            return ""
+
+        print(f"[Worker] Typing message... ({len(text)} chars)")
+        self._human_type(textbox, text)
+        
+        # Wait for send button to be enabled/visible
+        self.page.wait_for_selector(send_btn, state="visible", timeout=5000)
+        self._human_click(send_btn)
+
+        # 3. Monitor Response
+        response_text = self._monitor_response_state_machine(initial_count)
+        
+        # 4. Post-processing
+        # Remove potential artifacts or "Searching web..." lines if generic text is requested
+        # For now, return raw innerText as requested by the user ("checking last assistant message")
+        return response_text
+
+    def run_video_generation_workflow(self, initial_story: str) -> dict:
+        """
+        Orchestrates the 3-step workflow.
+        """
+        results = {}
+        try:
+            print("\n=== 🚀 Starting Smart Workflow (System Profile) ===")
+            
+            # Step 1
+            print("\n📍 Step 1: Fable Forge (Story Expansion)")
+            fable_prompt = f"{initial_story}\n\n이 이야기를 기승전결이 확실한, 재밌는 이야기로 풍성하게 만들어줘"
+            results["expanded_story"] = self.send_message_and_get_response(
+                fable_prompt, self.GPT_URLS["fable_forge"]
+            )
+            print(f"✅ Step 1 Done. Length: {len(results['expanded_story'])}")
+            
+            self._human_delay(2, 4)
+
+            # Step 2
+            print("\n📍 Step 2: Storyboard GPT")
+            sb_prompt = f"{results['expanded_story']}\n\n이 이야기를 스토리보드로 만들어봐"
+            results["storyboard"] = self.send_message_and_get_response(
+                sb_prompt, self.GPT_URLS["storyboard_gpt"]
+            )
+            print(f"✅ Step 2 Done. Length: {len(results['storyboard'])}")
+
+            self._human_delay(2, 4)
+
+            # Step 3
+            print("\n📍 Step 3: Storyboard Maker (Prompt Gen)")
+            pm_prompt = f"{results['storyboard']}\n\n이 스토리보드를 프롬프트로 만들어봐"
+            results["prompts"] = self.send_message_and_get_response(
+                pm_prompt, self.GPT_URLS["storyboard_maker"]
+            )
+            print(f"✅ Step 3 Done. Length: {len(results['prompts'])}")
+
+            return results
+
         except Exception as e:
-            raise Exception(f"메시지 전송 실패: {str(e)}")
-
-        # Wait for generation
-        print("[Worker] 응답 대기 중...")
-        time.sleep(2)
-
-        # Wait for network idle
-        try:
-            self.page.wait_for_load_state("networkidle", timeout=120000)
-        except PlaywrightTimeoutError:
-            print("[Worker] Warning: Network idle timeout, continuing...")
-
-        # Wait for copy button
-        copy_button_selector = self._copy_button_selector()
-        try:
-            self.page.wait_for_selector(copy_button_selector, state="attached", timeout=120000)
-            print("[Worker] 응답 생성 완료")
-        except PlaywrightTimeoutError:
-            print("[Worker] Warning: Copy button wait timed out, extracting anyway...")
-
-        # Extract last response
-        assistant_selector = self._assistant_message_selector()
-        assistant_msgs = self.page.locator(assistant_selector)
-        count = assistant_msgs.count()
-
-        if count == 0:
-            raise Exception("ChatGPT 응답을 찾을 수 없습니다.")
-
-        last_msg = assistant_msgs.nth(count - 1)
-
-        try:
-            response_text = last_msg.inner_text()
-            print(f"[Worker] 응답 수신 완료 (길이: {len(response_text)} 문자)")
-            return response_text
-        except Exception as e:
-            raise Exception(f"응답 텍스트 추출 실패: {str(e)}")
+            print(f"\n❌ Workflow Failed: {e}")
+            raise e
 
     def close(self):
-        """브라우저 종료"""
-        print("[Worker] 브라우저 종료 중...")
-
-        if self.browser_context:
+        """Clean shutdown."""
+        if self.context:
             try:
-                # Save session state
-                if self.storage_state_path:
-                    self.browser_context.storage_state(path=str(self.storage_state_path))
-                    print(f"[Worker] 세션 저장: {self.storage_state_path}")
-            except Exception as e:
-                print(f"[Worker] Warning: Failed to save session: {e}")
-
-            try:
-                self.browser_context.close()
-            except Exception as e:
-                print(f"[Worker] Warning: Failed to close context: {e}")
-
+                # If CDP, just disconnect
+                if self.browser: 
+                    self.browser.close() # Actually disconnects in Playwright python sync (Connect) check docs?
+                    # Docs: browser.close() for connected browser disconnects.
+                else:
+                    self.context.close() # Close persistent context
+            except:
+                pass
+        
         if self.playwright:
-            try:
-                self.playwright.stop()
-            except Exception as e:
-                print(f"[Worker] Warning: Failed to stop playwright: {e}")
-
-        self.browser_context = None
-        self.page = None
-        self.playwright = None
-        print("[Worker] 브라우저 종료 완료")
+            self.playwright.stop()
 
     def __enter__(self):
         self.start_browser()
@@ -213,73 +354,3 @@ class ChatGPTClient:
 
     def __exit__(self, exc_type, exc, tb):
         self.close()
-
-    def run_video_generation_workflow(self, initial_story: str) -> dict:
-        """
-        3단계 워크플로우 실행 (동기)
-
-        1. Fable Forge: 이야기 확장
-        2. Storyboard GPT: 스토리보드 작성
-        3. Storyboard Maker: 프롬프트 생성
-
-        Returns:
-            dict: {
-                "expanded_story": str,
-                "storyboard": str,
-                "prompts": str
-            }
-        """
-        results = {}
-
-        try:
-            if not self.page:
-                self.start_browser()
-
-            print("\n" + "="*60)
-            print("=== 🎬 비디오 생성 워크플로우 시작 ===")
-            print("="*60 + "\n")
-
-            # Step 1: Fable Forge
-            print("📖 Step 1/3: 이야기 확장 (Fable Forge)")
-            fable_prompt = f"{initial_story}\n\n이 이야기를 기승전결이 확실한, 재밌는 이야기로 풍성하게 만들어줘"
-            expanded_story = self.send_message_and_get_response(
-                fable_prompt,
-                self.GPT_URLS["fable_forge"]
-            )
-            results["expanded_story"] = expanded_story
-            print(f"✅ Step 1 완료 (길이: {len(expanded_story)} 문자)\n")
-
-            time.sleep(2)
-
-            # Step 2: Storyboard GPT
-            print("🎬 Step 2/3: 스토리보드 작성 (Storyboard GPT)")
-            storyboard_prompt = f"{expanded_story}\n\n이 이야기를 스토리보드로 만들어봐"
-            storyboard = self.send_message_and_get_response(
-                storyboard_prompt,
-                self.GPT_URLS["storyboard_gpt"]
-            )
-            results["storyboard"] = storyboard
-            print(f"✅ Step 2 완료 (길이: {len(storyboard)} 문자)\n")
-
-            time.sleep(2)
-
-            # Step 3: Storyboard Maker
-            print("✨ Step 3/3: 프롬프트 생성 (Storyboard Maker)")
-            prompt_generation_prompt = f"{storyboard}\n\n이 스토리보드를 프롬프트로 만들어봐"
-            prompts = self.send_message_and_get_response(
-                prompt_generation_prompt,
-                self.GPT_URLS["storyboard_maker"]
-            )
-            results["prompts"] = prompts
-            print(f"✅ Step 3 완료 (길이: {len(prompts)} 문자)\n")
-
-            print("="*60)
-            print("=== 🎉 워크플로우 완료! ===")
-            print("="*60 + "\n")
-
-            return results
-
-        except Exception as e:
-            print(f"\n❌ 워크플로우 에러: {e}")
-            print("="*60 + "\n")
-            raise e
