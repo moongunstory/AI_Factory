@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict
 
-from worker.automation.chatgpt_client import ChatGPTClient
+from worker.automation.chatgpt_workflow import ChatGPTWorkflow
 from backend.core.debug_logger import save_error_log
 
 
@@ -14,14 +14,14 @@ class VideoWorkflowProcessor:
     def __init__(self, queue_dir: str = ".data/queue", results_dir: str = ".data/output"):
         self.queue_dir = Path(queue_dir)
         self.results_dir = Path(results_dir)
-        self.client: ChatGPTClient = None
+        self.workflow: ChatGPTWorkflow = None
 
     def ensure_client(self):
-        """ChatGPT 클라이언트 초기화 (필요 시)"""
-        if not self.client:
-            print("[Processor] ChatGPT 클라이언트 초기화 중...")
-            self.client = ChatGPTClient()
-            self.client.start_browser()
+        """ChatGPT 워크플로우 초기화 (필요 시)"""
+        if not self.workflow:
+            print("[Processor] ChatGPT 워크플로우 초기화 중...")
+            self.workflow = ChatGPTWorkflow(use_system_profile=True)
+            self.workflow.client.start_browser()
 
     def process_job(self, job_data: dict):
         """작업 처리 - 3단계 ChatGPT 워크플로우"""
@@ -39,8 +39,19 @@ class VideoWorkflowProcessor:
             # 처리 시작 시간 기록
             self._update_job_status(job_id, "processing", started_at=datetime.utcnow().isoformat())
 
-            # 3단계 워크플로우 실행
-            result = self.client.run_video_generation_workflow(story)
+            # 단계별 진행 상태 업데이트 콜백
+            def on_step_complete(step_num: int, result: str):
+                print(f"[Processor] Step {step_num} 완료 콜백")
+                step_names = {1: "expanded_story", 2: "storyboard", 3: "prompts"}
+                self._update_job_status(
+                    job_id,
+                    "processing",
+                    current_step=step_num,
+                    **{f"step_{step_num}_result": result[:200]}  # 미리보기용
+                )
+
+            # 3단계 워크플로우 실행 (콜백 전달)
+            result = self.workflow.run_three_step_workflow(story, on_step_complete=on_step_complete)
 
             # 결과 저장
             self._save_result(job_id, result)
@@ -60,7 +71,7 @@ class VideoWorkflowProcessor:
                 "story": story,
                 "endpoint": "video_workflow"
             }
-            page = self.client.page if self.client else None
+            page = self.workflow.client.driver if self.workflow else None
             save_error_log(e, context=context, page=page)
 
             self._move_to_completed(job_id, success=False, error=str(e))
@@ -125,8 +136,8 @@ class VideoWorkflowProcessor:
 
     def cleanup(self):
         """리소스 정리"""
-        if self.client:
+        if self.workflow:
             try:
-                self.client.close()
+                self.workflow.close()
             except Exception as e:
-                print(f"[Processor] Warning: Failed to close client: {e}")
+                print(f"[Processor] Warning: Failed to close workflow: {e}")
